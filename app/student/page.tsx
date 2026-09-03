@@ -60,7 +60,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { GraduationCap, LogOut, BookOpen } from "lucide-react";
 import { getStudentAssignments } from "@/lib/storage";
@@ -90,18 +89,29 @@ export default function StudentPortalPage() {
     }
     setStudent(session);
 
-    async function loadData() {
+    async function loadData(studentId: string) {
       const defaultList: Assignment[] = [
-        { id: "1", title: "Physics Quiz 1", subject: "Physics", dueDate: "2026-09-10", grade: "Grade 11", status: "pending" },
-        { id: "2", title: "Math Algebra Sheet", subject: "Mathematics", dueDate: "2026-09-12", grade: "Grade 11", status: "pending" }
+        {
+          id: "1",
+          title: "Physics Quiz 1",
+          course: "Physics",
+          dueDate: "2026-09-10",
+          status: "pending",
+        },
+        {
+          id: "2",
+          title: "Math Algebra Sheet",
+          course: "Mathematics",
+          dueDate: "2026-09-12",
+          status: "pending",
+        },
       ];
-      // Await the async Supabase call here:
-      const data = await getStudentAssignments(session.studentId, defaultList);
+      const data = await getStudentAssignments(studentId, defaultList);
       setAssignments(data);
       setLoading(false);
     }
 
-    loadData();
+    loadData(session.studentId);
   }, [router]);
 
   const handleSignOut = () => {
@@ -142,7 +152,9 @@ export default function StudentPortalPage() {
       <main className="max-w-5xl mx-auto p-6 space-y-6">
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
           <h2 className="text-xl font-bold text-white">Welcome back, {student?.studentName}</h2>
-          <p className="text-xs text-slate-400 mt-1">Student ID: {student?.studentId} • {student?.studentEmail}</p>
+          <p className="text-xs text-slate-400 mt-1">
+            Student ID: {student?.studentId} • {student?.studentEmail}
+          </p>
         </div>
 
         <div className="space-y-4">
@@ -151,10 +163,15 @@ export default function StudentPortalPage() {
           </h3>
           <div className="grid gap-3">
             {assignments.map((item) => (
-              <div key={item.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between">
+              <div
+                key={item.id}
+                className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between"
+              >
                 <div>
                   <strong className="block text-sm text-white">{item.title}</strong>
-                  <span className="text-xs text-slate-400">{item.subject} • Due: {item.dueDate}</span>
+                  <span className="text-xs text-slate-400">
+                    {item.course} • Due: {item.dueDate}
+                  </span>
                 </div>
                 <span className="text-xs font-semibold px-3 py-1 rounded-full bg-amber-950 border border-amber-500/30 text-amber-300">
                   {item.status}
