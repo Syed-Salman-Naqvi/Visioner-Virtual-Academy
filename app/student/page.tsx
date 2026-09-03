@@ -90,7 +90,7 @@ export default function StudentPortalPage() {
     setStudent(session);
 
     async function loadData(studentId: string) {
-      const defaultList: Assignment[] = [
+      const defaultList = [
         {
           id: "1",
           title: "Physics Quiz 1",
@@ -105,7 +105,8 @@ export default function StudentPortalPage() {
           dueDate: "2026-09-12",
           status: "pending",
         },
-      ];
+      ] as unknown as Assignment[];
+
       const data = await getStudentAssignments(studentId, defaultList);
       setAssignments(data);
       setLoading(false);
