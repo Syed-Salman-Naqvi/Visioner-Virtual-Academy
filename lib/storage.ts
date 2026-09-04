@@ -115,130 +115,164 @@
 //   }
 // }
 
-import { AdmissionsApplication, Assignment, ChatMessage, StudentAccount } from "./types";
-import { supabase } from './supabase';
 
-// ==================== ADMISSIONS APPLICATIONS ====================
 
+import { supabase } from "./supabase";
+import { AdmissionsApplication, StudentAccount, Assignment } from "./types";
+import { mockApplications } from "./mockData";
+
+// Fetch applications from Supabase cloud database
 export async function getSavedApplications(): Promise<AdmissionsApplication[]> {
   try {
-    const { data, error } = await supabase.from('admissions').select('*');
-    if (error) throw error;
-    return data || [];
-  } catch (e) {
-    console.error("Failed to load applications from Supabase", e);
-    return [];
+    const { data, error } = await supabase
+      .from("applications")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error || !data || data.length === 0) {
+      if (typeof window !== "undefined") {
+        const raw = localStorage.getItem("vva_admissions_apps");
+        return raw ? JSON.parse(raw) : mockApplications;
+      }
+      return mockApplications;
+    }
+
+    return data.map((item) => ({
+      id: item.id,
+      createdAt: item.created_at || item.createdAt,
+      status: item.status,
+      studentName: item.student_name || item.studentName,
+      studentEmail: item.student_email || item.studentEmail,
+      dateOfBirth: item.date_of_birth || item.dateOfBirth,
+      nationality: item.nationality,
+      countryOfResidence: item.country_of_residence || item.countryOfResidence,
+      city: item.city,
+      parentName: item.parent_name || item.parentName,
+      parentEmail: item.parent_email || item.parentEmail,
+      parentPhone: item.parent_phone || item.parentPhone,
+      targetTrack: item.target_track || item.targetTrack,
+      gradeLevel: item.grade_level || item.gradeLevel,
+      timeZone: item.time_zone || item.timeZone,
+      preferredCohortSlot: item.preferred_cohort_slot || item.preferredCohortSlot,
+      assignedAdvisor: item.assigned_advisor || item.assignedAdvisor,
+      documentsAttached: item.documents_attached || item.documentsAttached || [],
+      statementOfPurpose: item.statement_of_purpose || item.statementOfPurpose,
+    }));
+  } catch {
+    if (typeof window !== "undefined") {
+      const raw = localStorage.getItem("vva_admissions_apps");
+      return raw ? JSON.parse(raw) : mockApplications;
+    }
+    return mockApplications;
   }
 }
 
+// Save application to Supabase
 export async function saveApplication(app: AdmissionsApplication): Promise<void> {
+  if (typeof window !== "undefined") {
+    const existing = localStorage.getItem("vva_admissions_apps");
+    const list: AdmissionsApplication[] = existing ? JSON.parse(existing) : mockApplications;
+    const next = [app, ...list.filter((i) => i.id !== app.id)];
+    localStorage.setItem("vva_admissions_apps", JSON.stringify(next));
+  }
+
   try {
-    const { error } = await supabase.from('admissions').upsert(app);
-    if (error) throw error;
+    await supabase.from("applications").upsert({
+      id: app.id,
+      created_at: app.createdAt,
+      status: app.status,
+      student_name: app.studentName,
+      student_email: app.studentEmail,
+      date_of_birth: app.dateOfBirth,
+      nationality: app.nationality,
+      country_of_residence: app.countryOfResidence,
+      city: app.city,
+      parent_name: app.parentName,
+      parent_email: app.parentEmail,
+      parent_phone: app.parentPhone,
+      target_track: app.targetTrack,
+      grade_level: app.gradeLevel,
+      time_zone: app.timeZone,
+      preferred_cohort_slot: app.preferredCohortSlot,
+      assigned_advisor: app.assignedAdvisor,
+      documents_attached: app.documentsAttached,
+      statement_of_purpose: app.statementOfPurpose,
+    });
   } catch (e) {
-    console.error("Failed to save application to Supabase", e);
+    console.error("Supabase Save Error:", e);
   }
 }
 
-export async function findApplicationById(id: string): Promise<AdmissionsApplication | undefined> {
-  try {
-    const apps = await getSavedApplications();
-    const cleanId = id.trim().toUpperCase();
-    return apps.find((a) => a.id.toUpperCase() === cleanId);
-  } catch (e) {
-    console.error("Failed to find application", e);
-    return undefined;
-  }
+export async function findApplicationById(id: string): Promise<AdmissionsApplication | null> {
+  const apps = await getSavedApplications();
+  return apps.find((item) => item.id.toUpperCase() === id.trim().toUpperCase()) || null;
 }
-
-// ==================== STUDENT ACCOUNTS ====================
 
 export async function getStudentAccounts(): Promise<StudentAccount[]> {
   try {
-    const { data, error } = await supabase.from('student_accounts').select('*');
-    if (error) throw error;
-    return data || [];
+    const { data, error } = await supabase.from("student_accounts").select("*");
+    if (error || !data) {
+      if (typeof window !== "undefined") {
+        const raw = localStorage.getItem("vva_student_accounts");
+        return raw ? JSON.parse(raw) : [];
+      }
+      return [];
+    }
+    return data.map((item) => ({
+      applicationId: item.application_id,
+      studentId: item.student_id,
+      password: item.password,
+      studentName: item.student_name,
+      studentEmail: item.student_email,
+      createdAt: item.created_at,
+    }));
   } catch {
+    if (typeof window !== "undefined") {
+      const raw = localStorage.getItem("vva_student_accounts");
+      return raw ? JSON.parse(raw) : [];
+    }
     return [];
   }
 }
 
 export async function saveStudentAccount(account: StudentAccount): Promise<void> {
+  if (typeof window !== "undefined") {
+    const raw = localStorage.getItem("vva_student_accounts");
+    const list: StudentAccount[] = raw ? JSON.parse(raw) : [];
+    const next = [account, ...list.filter((i) => i.applicationId !== account.applicationId)];
+    localStorage.setItem("vva_student_accounts", JSON.stringify(next));
+  }
+
   try {
-    const { error } = await supabase.from('student_accounts').upsert(account);
-    if (error) throw error;
+    await supabase.from("student_accounts").upsert({
+      application_id: account.applicationId,
+      student_id: account.studentId,
+      password: account.password,
+      student_name: account.studentName,
+      student_email: account.studentEmail,
+      created_at: account.createdAt,
+    });
   } catch (e) {
-    console.error("Failed to save student account", e);
+    console.error("Supabase Save Error:", e);
   }
 }
 
-export async function findStudentAccount(studentId: string, password: string): Promise<StudentAccount | undefined> {
-  try {
-    const accounts = await getStudentAccounts();
-    return accounts.find((account) => account.studentId.toLowerCase() === studentId.trim().toLowerCase() && account.password === password);
-  } catch {
-    return undefined;
+export async function getStudentAssignments(
+  studentId: string,
+  defaultList: Assignment[]
+): Promise<Assignment[]> {
+  if (typeof window !== "undefined") {
+    const raw = localStorage.getItem(`vva_assignments_${studentId}`);
+    return raw ? JSON.parse(raw) : defaultList;
   }
+  return defaultList;
 }
 
-// ==================== ASSIGNMENTS ====================
-
-export async function getSavedAssignments(defaultList: Assignment[]): Promise<Assignment[]> {
-  try {
-    const { data, error } = await supabase.from('assignments').select('*');
-    if (error || !data || data.length === 0) return defaultList;
-    return data;
-  } catch {
-    return defaultList;
-  }
-}
-
-export async function updateAssignmentStatus(id: string, newStatus: "pending" | "submitted" | "graded"): Promise<Assignment[]> {
-  try {
-    const { error } = await supabase.from('assignments').update({ status: newStatus }).eq('id', id);
-    if (error) throw error;
-    return await getSavedAssignments([]);
-  } catch {
-    return [];
-  }
-}
-
-export async function getStudentAssignments(studentId: string, defaultList: Assignment[]): Promise<Assignment[]> {
-  try {
-    const { data, error } = await supabase.from('assignments').select('*').eq('studentId', studentId);
-    if (error || !data || data.length === 0) return defaultList;
-    return data;
-  } catch {
-    return defaultList;
-  }
-}
-
-export async function saveStudentAssignments(studentId: string, assignments: Assignment[]): Promise<void> {
-  try {
-    const { error } = await supabase.from('assignments').upsert(assignments);
-    if (error) throw error;
-  } catch (e) {
-    console.error("Failed to save assignments", e);
-  }
-}
-
-// ==================== TUTOR CHAT ====================
-
-export async function getSavedChat(): Promise<ChatMessage[]> {
-  try {
-    const { data, error } = await supabase.from('chat_history').select('*');
-    if (error) throw error;
-    return data || [];
-  } catch {
-    return [];
-  }
-}
-
-export async function appendChatMessage(msg: ChatMessage): Promise<void> {
-  try {
-    const { error } = await supabase.from('chat_history').insert([msg]);
-    if (error) throw error;
-  } catch (e) {
-    console.error("Failed to save chat message", e);
+export async function saveStudentAssignments(
+  studentId: string,
+  assignments: Assignment[]
+): Promise<void> {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(`vva_assignments_${studentId}`, JSON.stringify(assignments));
   }
 }
