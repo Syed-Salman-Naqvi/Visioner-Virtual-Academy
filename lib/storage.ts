@@ -117,12 +117,15 @@
 
 
 
+
 import { supabase } from "./supabase";
 import { AdmissionsApplication, StudentAccount, Assignment } from "./types";
 import { mockApplications } from "./mockData";
 
-// Fetch applications from Supabase cloud database
 export async function getSavedApplications(): Promise<AdmissionsApplication[]> {
+  if (typeof window === "undefined") {
+    return mockApplications;
+  }
   try {
     const { data, error } = await supabase
       .from("applications")
@@ -130,50 +133,47 @@ export async function getSavedApplications(): Promise<AdmissionsApplication[]> {
       .order("created_at", { ascending: false });
 
     if (error || !data || data.length === 0) {
-      if (typeof window !== "undefined") {
-        const raw = localStorage.getItem("vva_admissions_apps");
-        return raw ? JSON.parse(raw) : mockApplications;
-      }
-      return mockApplications;
+      const raw = localStorage.getItem("vva_admissions_apps");
+      return raw ? JSON.parse(raw) : mockApplications;
     }
 
     return data.map((item) => ({
       id: item.id,
-      createdAt: item.created_at || item.createdAt,
-      status: item.status,
-      studentName: item.student_name || item.studentName,
-      studentEmail: item.student_email || item.studentEmail,
-      dateOfBirth: item.date_of_birth || item.dateOfBirth,
-      nationality: item.nationality,
-      countryOfResidence: item.country_of_residence || item.countryOfResidence,
-      city: item.city,
-      parentName: item.parent_name || item.parentName,
-      parentEmail: item.parent_email || item.parentEmail,
-      parentPhone: item.parent_phone || item.parentPhone,
-      targetTrack: item.target_track || item.targetTrack,
-      gradeLevel: item.grade_level || item.gradeLevel,
-      timeZone: item.time_zone || item.timeZone,
-      preferredCohortSlot: item.preferred_cohort_slot || item.preferredCohortSlot,
-      assignedAdvisor: item.assigned_advisor || item.assignedAdvisor,
+      createdAt: item.created_at || item.createdAt || "2026-09-01",
+      status: item.status || "Under Review",
+      studentName: item.student_name || item.studentName || "Student",
+      studentEmail: item.student_email || item.studentEmail || "",
+      dateOfBirth: item.date_of_birth || item.dateOfBirth || "",
+      nationality: item.nationality || "",
+      countryOfResidence: item.country_of_residence || item.countryOfResidence || "",
+      city: item.city || "",
+      parentName: item.parent_name || item.parentName || "",
+      parentEmail: item.parent_email || item.parentEmail || "",
+      parentPhone: item.parent_phone || item.parentPhone || "",
+      targetTrack: item.target_track || item.targetTrack || "",
+      gradeLevel: item.grade_level || item.gradeLevel || "",
+      timeZone: item.time_zone || item.timeZone || "",
+      preferredCohortSlot: item.preferred_cohort_slot || item.preferredCohortSlot || "",
+      assignedAdvisor: item.assigned_advisor || item.assignedAdvisor || "Admissions Office",
       documentsAttached: item.documents_attached || item.documentsAttached || [],
-      statementOfPurpose: item.statement_of_purpose || item.statementOfPurpose,
+      statementOfPurpose: item.statement_of_purpose || item.statementOfPurpose || "",
     }));
   } catch {
-    if (typeof window !== "undefined") {
-      const raw = localStorage.getItem("vva_admissions_apps");
-      return raw ? JSON.parse(raw) : mockApplications;
-    }
-    return mockApplications;
+    const raw = localStorage.getItem("vva_admissions_apps");
+    return raw ? JSON.parse(raw) : mockApplications;
   }
 }
 
-// Save application to Supabase
 export async function saveApplication(app: AdmissionsApplication): Promise<void> {
   if (typeof window !== "undefined") {
-    const existing = localStorage.getItem("vva_admissions_apps");
-    const list: AdmissionsApplication[] = existing ? JSON.parse(existing) : mockApplications;
-    const next = [app, ...list.filter((i) => i.id !== app.id)];
-    localStorage.setItem("vva_admissions_apps", JSON.stringify(next));
+    try {
+      const existing = localStorage.getItem("vva_admissions_apps");
+      const list: AdmissionsApplication[] = existing ? JSON.parse(existing) : mockApplications;
+      const next = [app, ...list.filter((i) => i.id !== app.id)];
+      localStorage.setItem("vva_admissions_apps", JSON.stringify(next));
+    } catch (e) {
+      console.error("Local storage error:", e);
+    }
   }
 
   try {
@@ -209,14 +209,14 @@ export async function findApplicationById(id: string): Promise<AdmissionsApplica
 }
 
 export async function getStudentAccounts(): Promise<StudentAccount[]> {
+  if (typeof window === "undefined") {
+    return [];
+  }
   try {
     const { data, error } = await supabase.from("student_accounts").select("*");
     if (error || !data) {
-      if (typeof window !== "undefined") {
-        const raw = localStorage.getItem("vva_student_accounts");
-        return raw ? JSON.parse(raw) : [];
-      }
-      return [];
+      const raw = localStorage.getItem("vva_student_accounts");
+      return raw ? JSON.parse(raw) : [];
     }
     return data.map((item) => ({
       applicationId: item.application_id,
@@ -227,20 +227,21 @@ export async function getStudentAccounts(): Promise<StudentAccount[]> {
       createdAt: item.created_at,
     }));
   } catch {
-    if (typeof window !== "undefined") {
-      const raw = localStorage.getItem("vva_student_accounts");
-      return raw ? JSON.parse(raw) : [];
-    }
-    return [];
+    const raw = localStorage.getItem("vva_student_accounts");
+    return raw ? JSON.parse(raw) : [];
   }
 }
 
 export async function saveStudentAccount(account: StudentAccount): Promise<void> {
   if (typeof window !== "undefined") {
-    const raw = localStorage.getItem("vva_student_accounts");
-    const list: StudentAccount[] = raw ? JSON.parse(raw) : [];
-    const next = [account, ...list.filter((i) => i.applicationId !== account.applicationId)];
-    localStorage.setItem("vva_student_accounts", JSON.stringify(next));
+    try {
+      const raw = localStorage.getItem("vva_student_accounts");
+      const list: StudentAccount[] = raw ? JSON.parse(raw) : [];
+      const next = [account, ...list.filter((i) => i.applicationId !== account.applicationId)];
+      localStorage.setItem("vva_student_accounts", JSON.stringify(next));
+    } catch (e) {
+      console.error("Local storage error:", e);
+    }
   }
 
   try {
@@ -261,11 +262,15 @@ export async function getStudentAssignments(
   studentId: string,
   defaultList: Assignment[]
 ): Promise<Assignment[]> {
-  if (typeof window !== "undefined") {
+  if (typeof window === "undefined") {
+    return defaultList;
+  }
+  try {
     const raw = localStorage.getItem(`vva_assignments_${studentId}`);
     return raw ? JSON.parse(raw) : defaultList;
+  } catch {
+    return defaultList;
   }
-  return defaultList;
 }
 
 export async function saveStudentAssignments(
@@ -273,6 +278,10 @@ export async function saveStudentAssignments(
   assignments: Assignment[]
 ): Promise<void> {
   if (typeof window !== "undefined") {
-    localStorage.setItem(`vva_assignments_${studentId}`, JSON.stringify(assignments));
+    try {
+      localStorage.setItem(`vva_assignments_${studentId}`, JSON.stringify(assignments));
+    } catch (e) {
+      console.error("Local storage error:", e);
+    }
   }
 }
