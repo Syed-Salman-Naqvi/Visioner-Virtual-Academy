@@ -158,11 +158,11 @@ export default function OwnerDashboardPage() {
 
   const selectApplication = (application: AdmissionsApplication) => { setSelectedApplication(application); const account = studentAccounts.find((item) => item.applicationId === application.id); setRecords(account ? getStudentPortalRecords(account.studentId) : { results: [], attendance: [], schedule: [] }); setResult(emptyResult); setAttendance(emptyAttendance); setSchedule(emptySchedule); };
   
-  const generateStudentAccount = async () => {
+ const generateStudentAccount = async () => {
     if (!selectedApplication) return;
     const account: StudentAccount = {
       applicationId: selectedApplication.id,
-      studentId: `VVA-${selectedApplication.id.replace(/[^A-Z0-9]/gi, "").slice(-6).toUpperCase()}`,
+      studentId: selectedApplication.id,
       password: `VVA${Math.floor(100000 + Math.random() * 900000)}`,
       studentName: selectedApplication.studentName,
       studentEmail: selectedApplication.studentEmail,

@@ -427,7 +427,7 @@ export async function getStudentAccounts(): Promise<StudentAccount[]> {
       if (!error && data && data.length > 0) {
         const dbAccounts: StudentAccount[] = data.map((item: any) => ({
           applicationId: item.application_id || item.applicationId,
-          studentId: item.student_id || item.studentId,
+          studentId: item.student_id || item.studentId || item.application_id || item.applicationId,
           password: item.password,
           studentName: item.student_name || item.studentName,
           studentEmail: item.student_email || item.studentEmail,
@@ -438,6 +438,9 @@ export async function getStudentAccounts(): Promise<StudentAccount[]> {
         [...localAccounts, ...dbAccounts].forEach((acc) => {
           if (acc?.studentId) {
             accountMap.set(acc.studentId.trim().toUpperCase(), acc);
+          }
+          if (acc?.applicationId) {
+            accountMap.set(acc.applicationId.trim().toUpperCase(), acc);
           }
         });
         return Array.from(accountMap.values());

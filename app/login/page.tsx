@@ -264,12 +264,15 @@ export default function LoginPage() {
       const accounts = await getStudentAccounts();
       const match = accounts.find(
         (acc) =>
-          acc?.studentId &&
-          acc.studentId.trim().toUpperCase() === cleanId &&
+          acc &&
+          (
+            acc.studentId?.trim().toUpperCase() === cleanId ||
+            acc.applicationId?.trim().toUpperCase() === cleanId ||
+            `VVA-${acc.applicationId?.replace(/[^A-Z0-9]/gi, "").slice(-6).toUpperCase()}` === cleanId
+          ) &&
           acc.password?.trim() === cleanPassword
       );
 
-      // Check generated accounts or fallback demo credentials
       if (match || (cleanId === "VVA-STU-8842" && cleanPassword === "123123")) {
         const activeId = match ? match.studentId : "VVA-STU-8842";
         const accountData = match || {
@@ -318,7 +321,7 @@ export default function LoginPage() {
           <form className="space-y-5" onSubmit={handleLogin}>
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Student ID
+                Student ID or Application ID
               </label>
               <div className="relative">
                 <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
@@ -327,7 +330,7 @@ export default function LoginPage() {
                   required
                   value={studentId}
                   onChange={(e) => setStudentId(e.target.value)}
-                  placeholder="e.g. VVA-INTL-123456"
+                  placeholder="e.g. VVA-INTL-443183"
                   className="w-full pl-10 pr-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 font-mono"
                 />
               </div>
