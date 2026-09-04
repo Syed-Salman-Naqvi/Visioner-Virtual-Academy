@@ -257,27 +257,42 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const cleanId = studentId.trim().toUpperCase();
-    const cleanPassword = password.trim();
+    const rawInputId = studentId.trim().toUpperCase();
+    const rawInputPassword = password.trim().toUpperCase();
 
     try {
       const accounts = await getStudentAccounts();
+
       const match = accounts.find((acc) => {
         if (!acc) return false;
-        const accStudentId = acc.studentId ? acc.studentId.trim().toUpperCase() : "";
-        const accAppId = acc.applicationId ? acc.applicationId.trim().toUpperCase() : "";
-        const accPassword = acc.password ? acc.password.trim() : "";
+
+        const storedStudentId = (acc.studentId || "").trim().toUpperCase();
+        const storedAppId = (acc.applicationId || "").trim().toUpperCase();
+        const storedPassword = (acc.password || "").trim().toUpperCase();
+
+        const inputDigits = rawInputId.replace(/[^0-9]/g, "");
+        const storedStudentDigits = storedStudentId.replace(/[^0-9]/g, "");
+        const storedAppDigits = storedAppId.replace(/[^0-9]/g, "");
 
         const idMatches =
-          accStudentId === cleanId ||
-          accAppId === cleanId ||
-          cleanId.replace("INTL-", "") === accStudentId ||
-          accAppId.replace("INTL-", "") === cleanId;
+          storedStudentId === rawInputId ||
+          storedAppId === rawInputId ||
+          storedStudentId.replace("INTL-", "") === rawInputId ||
+          storedAppId.replace("INTL-", "") === rawInputId ||
+          rawInputId.replace("INTL-", "") === storedStudentId ||
+          rawInputId.replace("INTL-", "") === storedAppId ||
+          (inputDigits.length >= 4 && (inputDigits === storedStudentDigits || inputDigits === storedAppDigits));
 
-        return idMatches && accPassword === cleanPassword;
+        const passwordMatches =
+          storedPassword === rawInputPassword ||
+          storedPassword.replace(/^VVA/i, "") === rawInputPassword ||
+          rawInputPassword.replace(/^VVA/i, "") === storedPassword ||
+          storedPassword.replace(/[^A-Z0-9]/gi, "") === rawInputPassword.replace(/[^A-Z0-9]/gi, "");
+
+        return idMatches && passwordMatches;
       });
 
-      if (match || (cleanId === "VVA-STU-8842" && cleanPassword === "123123")) {
+      if (match || (rawInputId === "VVA-STU-8842" && rawInputPassword === "123123")) {
         const activeAccount = match || {
           applicationId: "APP-8842",
           studentId: "VVA-STU-8842",
@@ -333,7 +348,7 @@ export default function LoginPage() {
                   required
                   value={studentId}
                   onChange={(e) => setStudentId(e.target.value)}
-                  placeholder="e.g. VVA-INTL-158187 or VVA-158187"
+                  placeholder="e.g. VVA-INTL-637407"
                   className="w-full pl-10 pr-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 font-mono"
                 />
               </div>

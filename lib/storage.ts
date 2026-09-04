@@ -412,22 +412,27 @@ export async function findApplicationById(id: string): Promise<AdmissionsApplica
 }
 
 export async function getStudentAccounts(): Promise<StudentAccount[]> {
-  let localAccounts: StudentAccount[] = [];
+  const accounts: StudentAccount[] = [];
+
   if (typeof window !== "undefined") {
     try {
       const raw = localStorage.getItem("vva_student_accounts");
-      if (raw) localAccounts = JSON.parse(raw);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          accounts.push(...parsed);
+        }
+      }
     } catch (e) {
-      console.error("Storage error:", e);
+      console.error("LocalStorage fetch error:", e);
     }
   }
 
-  let dbAccounts: StudentAccount[] = [];
   if (supabase) {
     try {
       const { data, error } = await supabase.from("student_accounts").select("*");
-      if (!error && data) {
-        dbAccounts = data.map((item: any) => ({
+      if (!error && data && Array.isArray(data)) {
+        const dbAccounts = data.map((item: any) => ({
           applicationId: item.application_id || item.applicationId,
           studentId: item.student_id || item.studentId || item.application_id || item.applicationId,
           password: item.password,
@@ -435,34 +440,44 @@ export async function getStudentAccounts(): Promise<StudentAccount[]> {
           studentEmail: item.student_email || item.studentEmail,
           createdAt: item.created_at || item.createdAt,
         }));
+        accounts.push(...dbAccounts);
       }
     } catch (e) {
       console.error("Supabase fetch accounts error:", e);
     }
   }
 
-  const accountMap = new Map<string, StudentAccount>();
-  [...dbAccounts, ...localAccounts].forEach((acc) => {
-    if (acc?.studentId) {
-      accountMap.set(acc.studentId.trim().toUpperCase(), acc);
-    }
-    if (acc?.applicationId) {
-      accountMap.set(acc.applicationId.trim().toUpperCase(), acc);
+  const uniqueMap = new Map<string, StudentAccount>();
+  accounts.forEach((acc) => {
+    if (!acc) return;
+    const key = (acc.studentId || acc.applicationId || "").trim().toUpperCase();
+    if (key) {
+      const existing = uniqueMap.get(key);
+      if (!existing || (!existing.password && acc.password)) {
+        uniqueMap.set(key, acc);
+      }
     }
   });
 
-  return Array.from(accountMap.values());
+  return Array.from(uniqueMap.values());
 }
 
 export async function saveStudentAccount(account: StudentAccount): Promise<void> {
+  if (!account) return;
+
   if (typeof window !== "undefined") {
     try {
       const raw = localStorage.getItem("vva_student_accounts");
       const list: StudentAccount[] = raw ? JSON.parse(raw) : [];
-      const next = [account, ...list.filter((i) => i.applicationId !== account.applicationId && i.studentId !== account.studentId)];
+      const filtered = list.filter(
+        (i) =>
+          i.applicationId?.toUpperCase() !== account.applicationId?.toUpperCase() &&
+          i.studentId?.toUpperCase() !== account.studentId?.toUpperCase()
+      );
+      const next = [account, ...filtered];
       localStorage.setItem("vva_student_accounts", JSON.stringify(next));
     } catch (e) {
-      console.error("Storage error:", e);
+      console.error("LocalStorage save error:", e);
     }
   }
 
@@ -476,7 +491,9 @@ export async function saveStudentAccount(account: StudentAccount): Promise<void>
         student_email: account.studentEmail,
         created_at: account.createdAt,
       });
-      if (error) console.error("Supabase account upsert error:", error);
+      if (error) {
+        console.error("Supabase account upsert error:", error);
+      }
     } catch (e) {
       console.error("Supabase account save error:", e);
     }

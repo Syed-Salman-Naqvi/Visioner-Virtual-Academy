@@ -181,20 +181,21 @@ export default function OwnerDashboardPage() {
   const generateStudentAccount = async () => {
     if (!selectedApplication) return;
     const appId = selectedApplication.id.trim();
+    const newPassword = `VVA${Math.floor(100000 + Math.random() * 900000)}`;
     const account: StudentAccount = {
       applicationId: appId,
       studentId: appId,
-      password: `VVA${Math.floor(100000 + Math.random() * 900000)}`,
+      password: newPassword,
       studentName: selectedApplication.studentName,
       studentEmail: selectedApplication.studentEmail,
       createdAt: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
     };
     await saveStudentAccount(account);
     migrateStudentPortalRecords(`application:${selectedApplication.id}`, account.studentId);
-    setStudentAccounts((items) => [account, ...items.filter((item) => item.applicationId !== account.applicationId)]);
+    setStudentAccounts((items) => [account, ...items.filter((item) => item.applicationId !== account.applicationId && item.studentId !== account.studentId)]);
     setRecords(getStudentPortalRecords(account.studentId));
-    setMessage("Student ID & password generated! Credentials active for portal sign in.");
-    window.setTimeout(() => setMessage(""), 3500);
+    setMessage(`Student ID & password generated! Credentials active: ${account.studentId} / ${account.password}`);
+    window.setTimeout(() => setMessage(""), 4000);
     setTab("records");
   };
 
