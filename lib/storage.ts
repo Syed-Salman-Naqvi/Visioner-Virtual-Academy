@@ -378,7 +378,7 @@ export async function saveApplication(app: AdmissionsApplication): Promise<void>
 
   if (supabase) {
     try {
-      await supabase.from("applications").upsert({
+      const { error } = await supabase.from("applications").upsert({
         id: app.id,
         created_at: app.createdAt,
         status: app.status,
@@ -399,6 +399,7 @@ export async function saveApplication(app: AdmissionsApplication): Promise<void>
         documents_attached: app.documentsAttached,
         statement_of_purpose: app.statementOfPurpose,
       });
+      if (error) console.error("Supabase application save error:", error);
     } catch (e) {
       console.error("Supabase save error:", e);
     }
@@ -421,11 +422,12 @@ export async function getStudentAccounts(): Promise<StudentAccount[]> {
     }
   }
 
+  let dbAccounts: StudentAccount[] = [];
   if (supabase) {
     try {
       const { data, error } = await supabase.from("student_accounts").select("*");
-      if (!error && data && data.length > 0) {
-        const dbAccounts: StudentAccount[] = data.map((item: any) => ({
+      if (!error && data) {
+        dbAccounts = data.map((item: any) => ({
           applicationId: item.application_id || item.applicationId,
           studentId: item.student_id || item.studentId || item.application_id || item.applicationId,
           password: item.password,
@@ -433,24 +435,24 @@ export async function getStudentAccounts(): Promise<StudentAccount[]> {
           studentEmail: item.student_email || item.studentEmail,
           createdAt: item.created_at || item.createdAt,
         }));
-
-        const accountMap = new Map<string, StudentAccount>();
-        [...localAccounts, ...dbAccounts].forEach((acc) => {
-          if (acc?.studentId) {
-            accountMap.set(acc.studentId.trim().toUpperCase(), acc);
-          }
-          if (acc?.applicationId) {
-            accountMap.set(acc.applicationId.trim().toUpperCase(), acc);
-          }
-        });
-        return Array.from(accountMap.values());
       }
     } catch (e) {
       console.error("Supabase fetch accounts error:", e);
     }
   }
 
-  return localAccounts;
+  // Merge local and remote database records into a unified unique set
+  const accountMap = new Map<string, StudentAccount>();
+  [...localAccounts, ...dbAccounts].forEach((acc) => {
+    if (acc?.studentId) {
+      accountMap.set(acc.studentId.trim().toUpperCase(), acc);
+    }
+    if (acc?.applicationId) {
+      accountMap.set(acc.applicationId.trim().toUpperCase(), acc);
+    }
+  });
+
+  return Array.from(accountMap.values());
 }
 
 export async function saveStudentAccount(account: StudentAccount): Promise<void> {
@@ -458,7 +460,7 @@ export async function saveStudentAccount(account: StudentAccount): Promise<void>
     try {
       const raw = localStorage.getItem("vva_student_accounts");
       const list: StudentAccount[] = raw ? JSON.parse(raw) : [];
-      const next = [account, ...list.filter((i) => i.applicationId !== account.applicationId)];
+      const next = [account, ...list.filter((i) => i.applicationId !== account.applicationId && i.studentId !== account.studentId)];
       localStorage.setItem("vva_student_accounts", JSON.stringify(next));
     } catch (e) {
       console.error("Storage error:", e);
@@ -467,7 +469,7 @@ export async function saveStudentAccount(account: StudentAccount): Promise<void>
 
   if (supabase) {
     try {
-      await supabase.from("student_accounts").upsert({
+      const { error } = await supabase.from("student_accounts").upsert({
         application_id: account.applicationId,
         student_id: account.studentId,
         password: account.password,
@@ -475,6 +477,7 @@ export async function saveStudentAccount(account: StudentAccount): Promise<void>
         student_email: account.studentEmail,
         created_at: account.createdAt,
       });
+      if (error) console.error("Supabase account upsert error:", error);
     } catch (e) {
       console.error("Supabase account save error:", e);
     }

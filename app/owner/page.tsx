@@ -161,8 +161,8 @@ export default function OwnerDashboardPage() {
  const generateStudentAccount = async () => {
     if (!selectedApplication) return;
     const account: StudentAccount = {
-      applicationId: selectedApplication.id,
-      studentId: selectedApplication.id,
+      applicationId: selectedApplication.id.trim(),
+      studentId: selectedApplication.id.trim(),
       password: `VVA${Math.floor(100000 + Math.random() * 900000)}`,
       studentName: selectedApplication.studentName,
       studentEmail: selectedApplication.studentEmail,

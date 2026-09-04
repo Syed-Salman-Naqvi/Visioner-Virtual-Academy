@@ -268,9 +268,9 @@ export default function LoginPage() {
           (
             acc.studentId?.trim().toUpperCase() === cleanId ||
             acc.applicationId?.trim().toUpperCase() === cleanId ||
-            `VVA-${acc.applicationId?.replace(/[^A-Z0-9]/gi, "").slice(-6).toUpperCase()}` === cleanId
+            cleanId.includes(acc.studentId?.replace(/[^A-Z0-9]/gi, "").slice(-6) || "")
           ) &&
-          acc.password?.trim() === cleanPassword
+          acc.password?.trim().toLowerCase() === cleanPassword.toLowerCase()
       );
 
       if (match || (cleanId === "VVA-STU-8842" && cleanPassword === "123123")) {
@@ -330,7 +330,7 @@ export default function LoginPage() {
                   required
                   value={studentId}
                   onChange={(e) => setStudentId(e.target.value)}
-                  placeholder="e.g. VVA-INTL-443183"
+                  placeholder="e.g. VVA-158187"
                   className="w-full pl-10 pr-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 font-mono"
                 />
               </div>
