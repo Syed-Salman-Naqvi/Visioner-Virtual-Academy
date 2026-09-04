@@ -67,11 +67,34 @@ import { GraduationCap, LogOut, BookOpen } from "lucide-react";
 import { getStudentAssignments } from "@/lib/storage";
 import { StudentAccount, Assignment } from "@/lib/types";
 
+const STUDENT_AUTH_FLAG = "vva_student_authenticated";
+const STUDENT_ID_KEY = "vva_active_student_id";
+const STUDENT_ACCOUNT_KEY = "vva_student_account";
+const STUDENT_AUTH_EVENT = "vva_student_auth_changed";
+
 function getStudentSession(): StudentAccount | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.sessionStorage.getItem("vva_student_account");
-    return raw ? (JSON.parse(raw) as StudentAccount) : null;
+    const authenticated = window.sessionStorage.getItem(STUDENT_AUTH_FLAG) === "true";
+    const raw = window.sessionStorage.getItem(STUDENT_ACCOUNT_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as StudentAccount;
+      if (parsed?.studentId) return parsed;
+    }
+    if (authenticated) {
+      const studentId = window.sessionStorage.getItem(STUDENT_ID_KEY) || "";
+      if (studentId) {
+        return {
+          applicationId: studentId,
+          studentId,
+          password: "",
+          studentName: "Student",
+          studentEmail: "",
+          createdAt: "",
+        };
+      }
+    }
+    return null;
   } catch {
     return null;
   }
@@ -90,6 +113,16 @@ export default function StudentPortalPage() {
       return;
     }
     setStudent(session);
+
+    const onAuthChange = () => {
+      const next = getStudentSession();
+      if (!next) {
+        router.push("/login");
+        return;
+      }
+      setStudent(next);
+    };
+    window.addEventListener(STUDENT_AUTH_EVENT, onAuthChange);
 
     async function loadData(studentId: string) {
       const defaultList = [
@@ -115,11 +148,15 @@ export default function StudentPortalPage() {
     }
 
     loadData(session.studentId);
+    return () => window.removeEventListener(STUDENT_AUTH_EVENT, onAuthChange);
   }, [router]);
 
   const handleSignOut = () => {
     if (typeof window !== "undefined") {
-      window.sessionStorage.removeItem("vva_student_account");
+      window.sessionStorage.removeItem(STUDENT_AUTH_FLAG);
+      window.sessionStorage.removeItem(STUDENT_ID_KEY);
+      window.sessionStorage.removeItem(STUDENT_ACCOUNT_KEY);
+      window.dispatchEvent(new Event(STUDENT_AUTH_EVENT));
     }
     router.push("/login");
   };

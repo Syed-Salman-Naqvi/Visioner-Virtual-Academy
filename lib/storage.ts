@@ -2,6 +2,167 @@ import { supabase } from "./supabase";
 import { AdmissionsApplication, StudentAccount, Assignment } from "./types";
 import { mockApplications } from "./mockData";
 
+function normalizeIdToken(value: string): string {
+  return (value || "").trim().toUpperCase().replace(/\s+/g, "");
+}
+
+function idDigits(value: string): string {
+  return normalizeIdToken(value).replace(/[^0-9]/g, "");
+}
+
+function idCore(value: string): string {
+  return normalizeIdToken(value)
+    .replace(/^VVA[-_]?/i, "")
+    .replace(/^INTL[-_]?/i, "")
+    .replace(/^APP[-_]?/i, "")
+    .replace(/^STU[-_]?/i, "")
+    .replace(/[^A-Z0-9]/g, "");
+}
+
+export function studentIdsMatch(input: string, stored: string): boolean {
+  const raw = normalizeIdToken(input);
+  const saved = normalizeIdToken(stored);
+  if (!raw || !saved) return false;
+  if (raw === saved) return true;
+
+  const rawNoIntl = raw.replace("INTL-", "");
+  const savedNoIntl = saved.replace("INTL-", "");
+  if (rawNoIntl === saved || savedNoIntl === raw || rawNoIntl === savedNoIntl) return true;
+
+  const rawCore = idCore(raw);
+  const savedCore = idCore(saved);
+  if (rawCore && rawCore === savedCore) return true;
+
+  const rawDigits = idDigits(raw);
+  const savedDigits = idDigits(saved);
+  return rawDigits.length >= 5 && savedDigits.length >= 5 && rawDigits === savedDigits;
+}
+
+export function studentPasswordsMatch(input: string, stored: string): boolean {
+  const raw = (input || "").trim();
+  const saved = (stored || "").trim();
+  if (!raw || !saved) return false;
+  if (raw === saved) return true;
+
+  const rawUpper = raw.toUpperCase();
+  const savedUpper = saved.toUpperCase();
+  if (rawUpper === savedUpper) return true;
+
+  const compact = (value: string) =>
+    value
+      .toUpperCase()
+      .replace(/^VVA[-_]?/i, "")
+      .replace(/[^A-Z0-9]/g, "");
+
+  const rawCompact = compact(raw);
+  const savedCompact = compact(saved);
+  return Boolean(rawCompact) && rawCompact === savedCompact;
+}
+
+function formatAccountDate(value?: string): string {
+  if (!value) {
+    return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  }
+  const parsed = new Date(value);
+  if (!Number.isNaN(parsed.getTime()) && (value.includes("T") || /^\d{4}-\d{2}-\d{2}/.test(value))) {
+    return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  }
+  return value;
+}
+
+function toIsoTimestamp(value?: string): string {
+  if (!value) return new Date().toISOString();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
+}
+
+function mapDbStudentAccount(item: Record<string, unknown>): StudentAccount | null {
+  if (!item) return null;
+  const applicationId = String(item.application_id || item.applicationId || "").trim();
+  const studentId = String(item.student_id || item.studentId || applicationId).trim();
+  const password = String(item.password || item.passcode || item.student_password || "").trim();
+  if (!studentId && !applicationId) return null;
+  return {
+    applicationId: applicationId || studentId,
+    studentId: studentId || applicationId,
+    password,
+    studentName: String(item.student_name || item.studentName || "Student"),
+    studentEmail: String(item.student_email || item.studentEmail || ""),
+    createdAt: formatAccountDate(String(item.created_at || item.createdAt || "")),
+  };
+}
+
+function mergeAccountPair(current: StudentAccount, incoming: StudentAccount): StudentAccount {
+  return {
+    applicationId: incoming.applicationId || current.applicationId,
+    studentId: incoming.studentId || current.studentId,
+    password: incoming.password?.trim() ? incoming.password : current.password,
+    studentName: incoming.studentName || current.studentName,
+    studentEmail: incoming.studentEmail || current.studentEmail,
+    createdAt: incoming.createdAt || current.createdAt,
+  };
+}
+
+function mergeStudentAccountLists(...groups: StudentAccount[][]): StudentAccount[] {
+  const byAlias = new Map<string, StudentAccount>();
+
+  const aliasesFor = (account: StudentAccount): string[] => {
+    const aliases = new Set<string>();
+    const studentId = normalizeIdToken(account.studentId);
+    const applicationId = normalizeIdToken(account.applicationId);
+    if (studentId) aliases.add(`sid:${studentId}`);
+    if (applicationId) aliases.add(`aid:${applicationId}`);
+    return Array.from(aliases);
+  };
+
+  for (const group of groups) {
+    for (const account of group) {
+      if (!account) continue;
+      const aliases = aliasesFor(account);
+      let existing: StudentAccount | undefined;
+      for (const alias of aliases) {
+        existing = byAlias.get(alias);
+        if (existing) break;
+      }
+      const merged = existing ? mergeAccountPair(existing, account) : account;
+      for (const alias of aliasesFor(merged)) {
+        byAlias.set(alias, merged);
+      }
+    }
+  }
+
+  const unique = new Map<string, StudentAccount>();
+  for (const account of byAlias.values()) {
+    const key = normalizeIdToken(account.studentId || account.applicationId);
+    if (!key) continue;
+    const prev = unique.get(key);
+    unique.set(key, prev ? mergeAccountPair(prev, account) : account);
+  }
+  return Array.from(unique.values());
+}
+
+function persistLocalStudentAccounts(accounts: StudentAccount[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem("vva_student_accounts", JSON.stringify(accounts));
+  } catch (e) {
+    console.error("LocalStorage save accounts error:", e);
+  }
+}
+
+function readLocalStudentAccounts(): StudentAccount[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem("vva_student_accounts");
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+  } catch (e) {
+    console.error("LocalStorage fetch accounts error:", e);
+    return [];
+  }
+}
+
 export async function getSavedApplications(): Promise<AdmissionsApplication[]> {
   let localApps: AdmissionsApplication[] = [];
   if (typeof window !== "undefined") {
@@ -111,85 +272,89 @@ export async function findApplicationById(id: string): Promise<AdmissionsApplica
 }
 
 export async function getStudentAccounts(): Promise<StudentAccount[]> {
-  let localAccounts: StudentAccount[] = [];
-  if (typeof window !== "undefined") {
-    try {
-      const raw = localStorage.getItem("vva_student_accounts");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) localAccounts = parsed;
-      }
-    } catch (e) {
-      console.error("LocalStorage fetch accounts error:", e);
-    }
-  }
+  const localAccounts = readLocalStudentAccounts();
 
   let dbAccounts: StudentAccount[] = [];
   if (supabase) {
     try {
-      const { data, error } = await supabase.from("student_accounts").select("*");
-      if (!error && data && Array.isArray(data)) {
-        dbAccounts = data.map((item: any) => ({
-          applicationId: item.application_id || item.applicationId,
-          studentId: item.student_id || item.studentId || item.application_id || item.applicationId,
-          password: item.password,
-          studentName: item.student_name || item.studentName,
-          studentEmail: item.student_email || item.studentEmail,
-          createdAt: item.created_at || item.createdAt,
-        }));
+      const { data, error } = await supabase
+        .from("student_accounts")
+        .select("application_id, student_id, password, student_name, student_email, created_at");
+
+      if (error) {
+        const fallback = await supabase.from("student_accounts").select("*");
+        if (!fallback.error && Array.isArray(fallback.data)) {
+          dbAccounts = fallback.data.map((item) => mapDbStudentAccount(item as Record<string, unknown>)).filter(Boolean) as StudentAccount[];
+        } else {
+          console.error("Supabase fetch accounts error:", error);
+        }
+      } else if (Array.isArray(data)) {
+        dbAccounts = data.map((item) => mapDbStudentAccount(item as Record<string, unknown>)).filter(Boolean) as StudentAccount[];
       }
     } catch (e) {
       console.error("Supabase fetch accounts error:", e);
     }
   }
 
-  const accountMap = new Map<string, StudentAccount>();
-  [...dbAccounts, ...localAccounts].forEach((acc) => {
-    if (!acc) return;
-    const studentKey = acc.studentId ? acc.studentId.trim().toUpperCase() : "";
-    const appKey = acc.applicationId ? acc.applicationId.trim().toUpperCase() : "";
-
-    if (studentKey) accountMap.set(studentKey, acc);
-    if (appKey) accountMap.set(appKey, acc);
-  });
-
-  return Array.from(new Set(accountMap.values()));
+  const merged = mergeStudentAccountLists(localAccounts, dbAccounts);
+  persistLocalStudentAccounts(merged);
+  return merged;
 }
 
-export async function saveStudentAccount(account: StudentAccount): Promise<void> {
-  if (!account) return;
+async function upsertStudentAccountRow(row: Record<string, unknown>): Promise<boolean> {
+  if (!supabase) return false;
 
-  if (typeof window !== "undefined") {
-    try {
-      const raw = localStorage.getItem("vva_student_accounts");
-      const list: StudentAccount[] = raw ? JSON.parse(raw) : [];
-      const filtered = list.filter(
-        (i) =>
-          i.applicationId?.toUpperCase() !== account.applicationId?.toUpperCase() &&
-          i.studentId?.toUpperCase() !== account.studentId?.toUpperCase()
-      );
-      const next = [account, ...filtered];
-      localStorage.setItem("vva_student_accounts", JSON.stringify(next));
-    } catch (e) {
-      console.error("LocalStorage save error:", e);
-    }
+  const dateOnly = typeof row.created_at === "string" ? String(row.created_at).slice(0, 10) : undefined;
+  const attempts: Array<{ payload: Record<string, unknown>; onConflict?: string }> = [
+    { payload: row, onConflict: "student_id" },
+    { payload: row, onConflict: "application_id" },
+    { payload: row },
+    { payload: { ...row, created_at: dateOnly }, onConflict: "student_id" },
+    { payload: { ...row, created_at: undefined }, onConflict: "student_id" },
+    { payload: { ...row, created_at: undefined }, onConflict: "application_id" },
+  ];
+
+  for (const attempt of attempts) {
+    const payload = Object.fromEntries(Object.entries(attempt.payload).filter(([, value]) => value !== undefined));
+    const query = attempt.onConflict
+      ? supabase.from("student_accounts").upsert(payload, { onConflict: attempt.onConflict })
+      : supabase.from("student_accounts").upsert(payload);
+    const { error } = await query;
+    if (!error) return true;
+    console.error("Supabase account upsert error:", error.message || error);
   }
 
-  if (supabase) {
-    try {
-      const { error } = await supabase.from("student_accounts").upsert({
-        application_id: account.applicationId,
-        student_id: account.studentId,
-        password: account.password,
-        student_name: account.studentName,
-        student_email: account.studentEmail,
-        created_at: account.createdAt,
-      });
-      if (error) console.error("Supabase account upsert error:", error);
-    } catch (e) {
-      console.error("Supabase account save error:", e);
-    }
-  }
+  const { error: insertError } = await supabase.from("student_accounts").insert(row);
+  if (!insertError) return true;
+  console.error("Supabase account insert error:", insertError);
+  return false;
+}
+
+export async function saveStudentAccount(account: StudentAccount): Promise<boolean> {
+  if (!account) return false;
+
+  const normalized: StudentAccount = {
+    applicationId: normalizeIdToken(account.applicationId || account.studentId),
+    studentId: normalizeIdToken(account.studentId || account.applicationId),
+    password: (account.password || "").trim(),
+    studentName: account.studentName,
+    studentEmail: account.studentEmail,
+    createdAt: formatAccountDate(account.createdAt),
+  };
+
+  const merged = mergeStudentAccountLists(readLocalStudentAccounts(), [normalized]);
+  persistLocalStudentAccounts(merged);
+
+  const cloudSynced = await upsertStudentAccountRow({
+    application_id: normalized.applicationId,
+    student_id: normalized.studentId,
+    password: normalized.password,
+    student_name: normalized.studentName,
+    student_email: normalized.studentEmail,
+    created_at: toIsoTimestamp(account.createdAt),
+  });
+
+  return cloudSynced;
 }
 
 export async function getStudentAssignments(studentId: string, defaultList: Assignment[]): Promise<Assignment[]> {

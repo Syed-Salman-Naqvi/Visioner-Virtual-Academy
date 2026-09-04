@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { GraduationCap, LogIn, Lock, User, ArrowLeft } from "lucide-react";
-import { getStudentAccounts } from "@/lib/storage";
+import { getStudentAccounts, studentIdsMatch, studentPasswordsMatch } from "@/lib/storage";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,42 +18,25 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const rawInputId = studentId.trim().toUpperCase();
-    const rawInputPassword = password.trim().toUpperCase();
+    const rawInputId = studentId.trim();
+    const rawInputPassword = password.trim();
 
     try {
       const accounts = await getStudentAccounts();
 
       const match = accounts.find((acc) => {
         if (!acc) return false;
-
-        const storedStudentId = (acc.studentId || "").trim().toUpperCase();
-        const storedAppId = (acc.applicationId || "").trim().toUpperCase();
-        const storedPassword = (acc.password || "").trim().toUpperCase();
-
-        const inputDigits = rawInputId.replace(/[^0-9]/g, "");
-        const storedStudentDigits = storedStudentId.replace(/[^0-9]/g, "");
-        const storedAppDigits = storedAppId.replace(/[^0-9]/g, "");
-
         const idMatches =
-          storedStudentId === rawInputId ||
-          storedAppId === rawInputId ||
-          storedStudentId.replace("INTL-", "") === rawInputId ||
-          storedAppId.replace("INTL-", "") === rawInputId ||
-          rawInputId.replace("INTL-", "") === storedStudentId ||
-          rawInputId.replace("INTL-", "") === storedAppId ||
-          (inputDigits.length >= 4 && (inputDigits === storedStudentDigits || inputDigits === storedAppDigits));
-
-        const passwordMatches =
-          storedPassword === rawInputPassword ||
-          storedPassword.replace(/^VVA/i, "") === rawInputPassword ||
-          rawInputPassword.replace(/^VVA/i, "") === storedPassword ||
-          storedPassword.replace(/[^A-Z0-9]/gi, "") === rawInputPassword.replace(/[^A-Z0-9]/gi, "");
-
+          studentIdsMatch(rawInputId, acc.studentId || "") ||
+          studentIdsMatch(rawInputId, acc.applicationId || "");
+        const passwordMatches = studentPasswordsMatch(rawInputPassword, acc.password || "");
         return idMatches && passwordMatches;
       });
 
-      if (match || (rawInputId === "VVA-STU-8842" && rawInputPassword === "123123")) {
+      const demoMatch =
+        studentIdsMatch(rawInputId, "VVA-STU-8842") && studentPasswordsMatch(rawInputPassword, "123123");
+
+      if (match || demoMatch) {
         const activeAccount = match || {
           applicationId: "APP-8842",
           studentId: "VVA-STU-8842",

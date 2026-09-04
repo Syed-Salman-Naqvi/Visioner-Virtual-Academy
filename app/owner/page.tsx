@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { BarChart3, CalendarDays, CheckCircle2, GraduationCap, LogIn, LogOut, Save, Wifi, WifiOff, Loader2 } from "lucide-react";
-import { getSavedApplications, getStudentAccounts, saveApplication, saveStudentAccount } from "@/lib/storage";
+import { getSavedApplications, getStudentAccounts, saveApplication, saveStudentAccount, studentIdsMatch } from "@/lib/storage";
 import { AdmissionsApplication, StudentAccount } from "@/lib/types";
 import { AcademicResult, AttendanceRecord, PortalRecords, ScheduleRecord, getPortalRecords, getStudentPortalRecords, migrateStudentPortalRecords, savePortalRecords, saveStudentPortalRecords } from "@/lib/portalData";
 import { supabase } from "@/lib/supabase";
@@ -74,7 +74,13 @@ export default function OwnerDashboardPage() {
     }
   }, [authenticated]);
 
-  const selectedAccount = selectedApplication ? studentAccounts.find((account) => account.applicationId === selectedApplication.id || account.studentId === selectedApplication.id) : undefined;
+  const selectedAccount = selectedApplication
+    ? studentAccounts.find(
+        (account) =>
+          studentIdsMatch(account.applicationId, selectedApplication.id) ||
+          studentIdsMatch(account.studentId, selectedApplication.id)
+      )
+    : undefined;
   const selectedRecordKey = selectedApplication ? (selectedAccount?.studentId || selectedApplication.id) : "";
 
   const updateRecords = async (next: PortalRecords) => {
@@ -98,7 +104,9 @@ export default function OwnerDashboardPage() {
 
   const selectApplication = async (application: AdmissionsApplication) => {
     setSelectedApplication(application);
-    const account = studentAccounts.find((item) => item.applicationId === application.id || item.studentId === application.id);
+    const account = studentAccounts.find(
+      (item) => studentIdsMatch(item.applicationId, application.id) || studentIdsMatch(item.studentId, application.id)
+    );
     const targetId = account ? account.studentId : application.id;
     const recs = await getStudentPortalRecords(targetId);
     setRecords(recs);
@@ -109,7 +117,7 @@ export default function OwnerDashboardPage() {
 
   const generateStudentAccount = async () => {
     if (!selectedApplication) return;
-    const appId = selectedApplication.id.trim();
+    const appId = selectedApplication.id.trim().toUpperCase();
     const newPassword = `VVA${Math.floor(100000 + Math.random() * 900000)}`;
     const account: StudentAccount = {
       applicationId: appId,
@@ -117,15 +125,20 @@ export default function OwnerDashboardPage() {
       password: newPassword,
       studentName: selectedApplication.studentName,
       studentEmail: selectedApplication.studentEmail,
-      createdAt: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      createdAt: new Date().toISOString(),
     };
-    await saveStudentAccount(account);
+    const cloudSynced = await saveStudentAccount(account);
     await migrateStudentPortalRecords(selectedApplication.id, account.studentId);
-    setStudentAccounts((items) => [account, ...items.filter((item) => item.applicationId !== account.applicationId && item.studentId !== account.studentId)]);
+    const refreshedAccounts = await getStudentAccounts();
+    setStudentAccounts(refreshedAccounts);
     const updatedRecords = await getStudentPortalRecords(account.studentId);
     setRecords(updatedRecords);
-    setMessage(`Account Generated! Credentials active: ${account.studentId} / ${account.password}`);
-    window.setTimeout(() => setMessage(""), 5000);
+    setMessage(
+      cloudSynced
+        ? `Account generated and synced. Credentials: ${account.studentId} / ${account.password}`
+        : `Account saved locally, but cloud sync failed. Credentials: ${account.studentId} / ${account.password}. Cross-device login will not work until Supabase accepts the upsert.`
+    );
+    window.setTimeout(() => setMessage(""), 8000);
     setTab("records");
   };
 

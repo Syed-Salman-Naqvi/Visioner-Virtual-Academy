@@ -71,31 +71,52 @@ export function savePortalRecords(records: PortalRecords): void {
   }
 }
 
+function portalIdCandidates(studentId: string): string[] {
+  const cleanId = (studentId || "").trim().toUpperCase().replace(/\s+/g, "");
+  if (!cleanId) return [];
+  const noIntl = cleanId.replace("INTL-", "");
+  const digits = cleanId.replace(/[^0-9]/g, "");
+  return Array.from(
+    new Set(
+      [
+        cleanId,
+        noIntl,
+        digits.length >= 5 ? `VVA-INTL-${digits}` : "",
+        digits.length >= 5 ? `VVA-${digits}` : "",
+      ].filter(Boolean)
+    )
+  );
+}
+
 export async function getStudentPortalRecords(studentId: string): Promise<PortalRecords> {
-  const cleanId = (studentId || "").trim().toUpperCase();
+  const candidates = portalIdCandidates(studentId);
 
-  if (supabase && cleanId) {
-    try {
-      const { data, error } = await supabase
-        .from("portal_records")
-        .select("records")
-        .eq("student_id", cleanId)
-        .maybeSingle();
+  if (supabase && candidates.length) {
+    for (const id of candidates) {
+      try {
+        const { data, error } = await supabase
+          .from("portal_records")
+          .select("records")
+          .eq("student_id", id)
+          .maybeSingle();
 
-      if (!error && data && data.records) {
-        return data.records as PortalRecords;
+        if (!error && data && data.records) {
+          return data.records as PortalRecords;
+        }
+      } catch (e) {
+        console.error("Supabase fetch portal records error:", e);
       }
-    } catch (e) {
-      console.error("Supabase fetch portal records error:", e);
     }
   }
 
-  if (typeof window !== "undefined" && cleanId) {
-    try {
-      const raw = localStorage.getItem(`vva_student_portal_records_${cleanId}`);
-      if (raw) return JSON.parse(raw);
-    } catch (e) {
-      console.error("LocalStorage fetch portal records error:", e);
+  if (typeof window !== "undefined") {
+    for (const id of candidates) {
+      try {
+        const raw = localStorage.getItem(`vva_student_portal_records_${id}`);
+        if (raw) return JSON.parse(raw);
+      } catch (e) {
+        console.error("LocalStorage fetch portal records error:", e);
+      }
     }
   }
 
@@ -103,7 +124,7 @@ export async function getStudentPortalRecords(studentId: string): Promise<Portal
 }
 
 export async function saveStudentPortalRecords(studentId: string, records: PortalRecords): Promise<void> {
-  const cleanId = (studentId || "").trim().toUpperCase();
+  const cleanId = (studentId || "").trim().toUpperCase().replace(/\s+/g, "");
   if (!cleanId) return;
 
   if (typeof window !== "undefined") {
@@ -115,13 +136,17 @@ export async function saveStudentPortalRecords(studentId: string, records: Porta
   }
 
   if (supabase) {
+    const payload = {
+      student_id: cleanId,
+      records,
+      updated_at: new Date().toISOString(),
+    };
     try {
-      const { error } = await supabase.from("portal_records").upsert({
-        student_id: cleanId,
-        records: records,
-        updated_at: new Date().toISOString(),
-      });
-      if (error) console.error("Supabase portal records upsert error:", error);
+      const withConflict = await supabase.from("portal_records").upsert(payload, { onConflict: "student_id" });
+      if (!withConflict.error) return;
+      console.error("Supabase portal records upsert error:", withConflict.error);
+      const fallback = await supabase.from("portal_records").upsert(payload);
+      if (fallback.error) console.error("Supabase portal records upsert error:", fallback.error);
     } catch (e) {
       console.error("Supabase save portal records error:", e);
     }
