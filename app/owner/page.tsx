@@ -101,6 +101,7 @@
 
 
 "use client";
+
 import React, { useState, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { BarChart3, CalendarDays, CheckCircle2, GraduationCap, LogIn, LogOut, Save } from "lucide-react";
@@ -132,9 +133,7 @@ export default function OwnerDashboardPage() {
   const [schedule, setSchedule] = useState<ScheduleRecord>(emptySchedule);
   const [message, setMessage] = useState("");
 
-  // Fetch applications and student accounts from Supabase on mount
   useEffect(() => {
-    if (!authenticated) return;
     async function loadData() {
       const apps = await getSavedApplications();
       const accounts = await getStudentAccounts();
@@ -158,7 +157,6 @@ export default function OwnerDashboardPage() {
   };
 
   const selectApplication = (application: AdmissionsApplication) => { setSelectedApplication(application); const account = studentAccounts.find((item) => item.applicationId === application.id); setRecords(account ? getStudentPortalRecords(account.studentId) : { results: [], attendance: [], schedule: [] }); setResult(emptyResult); setAttendance(emptyAttendance); setSchedule(emptySchedule); };
-  const openStudentRecords = (application: AdmissionsApplication) => { selectApplication(application); setTab("records"); };
   
   const generateStudentAccount = async () => {
     if (!selectedApplication) return;
