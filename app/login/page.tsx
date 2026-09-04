@@ -262,20 +262,23 @@ export default function LoginPage() {
 
     try {
       const accounts = await getStudentAccounts();
-      const match = accounts.find(
-        (acc) =>
-          acc &&
-          (
-            acc.studentId?.trim().toUpperCase() === cleanId ||
-            acc.applicationId?.trim().toUpperCase() === cleanId ||
-            cleanId.includes(acc.studentId?.replace(/[^A-Z0-9]/gi, "").slice(-6) || "")
-          ) &&
-          acc.password?.trim().toLowerCase() === cleanPassword.toLowerCase()
-      );
+      const match = accounts.find((acc) => {
+        if (!acc) return false;
+        const accStudentId = acc.studentId ? acc.studentId.trim().toUpperCase() : "";
+        const accAppId = acc.applicationId ? acc.applicationId.trim().toUpperCase() : "";
+        const accPassword = acc.password ? acc.password.trim() : "";
+
+        const idMatches =
+          accStudentId === cleanId ||
+          accAppId === cleanId ||
+          cleanId.replace("INTL-", "") === accStudentId ||
+          accAppId.replace("INTL-", "") === cleanId;
+
+        return idMatches && accPassword === cleanPassword;
+      });
 
       if (match || (cleanId === "VVA-STU-8842" && cleanPassword === "123123")) {
-        const activeId = match ? match.studentId : "VVA-STU-8842";
-        const accountData = match || {
+        const activeAccount = match || {
           applicationId: "APP-8842",
           studentId: "VVA-STU-8842",
           password: "123123",
@@ -286,8 +289,8 @@ export default function LoginPage() {
 
         if (typeof window !== "undefined") {
           window.sessionStorage.setItem("vva_student_authenticated", "true");
-          window.sessionStorage.setItem("vva_active_student_id", activeId);
-          window.sessionStorage.setItem("vva_student_account", JSON.stringify(accountData));
+          window.sessionStorage.setItem("vva_active_student_id", activeAccount.studentId);
+          window.sessionStorage.setItem("vva_student_account", JSON.stringify(activeAccount));
           window.dispatchEvent(new Event("vva_student_auth_changed"));
         }
         router.push("/student");
@@ -330,7 +333,7 @@ export default function LoginPage() {
                   required
                   value={studentId}
                   onChange={(e) => setStudentId(e.target.value)}
-                  placeholder="e.g. VVA-158187"
+                  placeholder="e.g. VVA-INTL-158187 or VVA-158187"
                   className="w-full pl-10 pr-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 font-mono"
                 />
               </div>

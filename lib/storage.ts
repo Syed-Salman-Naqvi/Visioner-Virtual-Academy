@@ -441,9 +441,8 @@ export async function getStudentAccounts(): Promise<StudentAccount[]> {
     }
   }
 
-  // Merge local and remote database records into a unified unique set
   const accountMap = new Map<string, StudentAccount>();
-  [...localAccounts, ...dbAccounts].forEach((acc) => {
+  [...dbAccounts, ...localAccounts].forEach((acc) => {
     if (acc?.studentId) {
       accountMap.set(acc.studentId.trim().toUpperCase(), acc);
     }
