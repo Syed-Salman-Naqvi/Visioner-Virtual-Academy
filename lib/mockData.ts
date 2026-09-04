@@ -1,4 +1,33 @@
-import { Course, FacultyMember, Assignment, TimetableEntry } from "./types";
+// 
+
+
+
+
+import { Course, FacultyMember, Assignment, TimetableEntry, AdmissionsApplication } from "./types";
+
+export const mockApplications: AdmissionsApplication[] = [
+  {
+    id: "VVA-2026-8842",
+    createdAt: "2026-08-15",
+    status: "Accepted",
+    studentName: "Aiden Vance",
+    studentEmail: "aiden.vance@example.com",
+    dateOfBirth: "2008-11-04",
+    nationality: "British",
+    countryOfResidence: "United Kingdom",
+    city: "London",
+    parentName: "Eleanor Vance",
+    parentEmail: "eleanor.vance@example.com",
+    parentPhone: "+44 7700 900077",
+    targetTrack: "Cambridge AS-Level",
+    gradeLevel: "Grade 11 / Year 12",
+    timeZone: "GMT+0 (London)",
+    preferredCohortSlot: "Morning (08:00 - 12:00 GMT)",
+    assignedAdvisor: "Dr. Sarah Jenkins",
+    documentsAttached: ["Transcript_2025.pdf", "Passport_Copy.pdf"],
+    statementOfPurpose: "Seeking advanced STEM track with focus on Physics and Further Math.",
+  },
+];
 
 export const MOCK_COURSES: Course[] = [
   {
@@ -154,7 +183,7 @@ export const MOCK_COURSES: Course[] = [
     instructor: "Syed Muhammad Salman Naqvi",
     instructorTitle: "M.Sc. in Applied Physics",
     description:
-      "A comprehensive physics programme covering mechanics, motion, forces, energy, waves, electricity, magnetism, thermal physics, optics, and modern physics, designed to build strong concepts, analytical thinking, problem-solving skills, and exam readiness.  ",
+      "A comprehensive physics programme covering mechanics, motion, forces, energy, waves, electricity, magnetism, thermal physics, optics, and modern physics, designed to build strong concepts, analytical thinking, problem-solving skills, and exam readiness.",
     syllabus: [
       "Physical Quantities and Measurement",
       "Kinematics",
@@ -165,13 +194,10 @@ export const MOCK_COURSES: Course[] = [
       "Properties of Matter",
       "Energy Sources and Transfer of Energy",
       "Thermal Properties of Matter",
-
-
     ],
     prerequisites: "Must clear 8 standard",
     examCode: "College Board AP Chem",
   },
- 
 ];
 
 export const MOCK_FACULTY: FacultyMember[] = [
@@ -355,4 +381,3 @@ export const CURRENCY_RATES = {
   CAD: { symbol: "CA$", rate: 1.36, name: "Canadian Dollar (CAD)" },
   AUD: { symbol: "AU$", rate: 1.52, name: "Australian Dollar (AUD)" },
 };
-
