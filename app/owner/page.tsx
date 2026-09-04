@@ -2,12 +2,15 @@
 
 import React, { useState, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { BarChart3, CalendarDays, CheckCircle2, GraduationCap, LogIn, LogOut, Save } from "lucide-react";
+import { BarChart3, CalendarDays, CheckCircle2, GraduationCap, LogIn, LogOut, Save, Wifi, WifiOff, Loader2 } from "lucide-react";
 import { getSavedApplications, getStudentAccounts, saveApplication, saveStudentAccount } from "@/lib/storage";
 import { AdmissionsApplication, StudentAccount } from "@/lib/types";
 import { AcademicResult, AttendanceRecord, PortalRecords, ScheduleRecord, getPortalRecords, getStudentPortalRecords, migrateStudentPortalRecords, savePortalRecords, saveStudentPortalRecords } from "@/lib/portalData";
+import { supabase } from "@/lib/supabase";
 
 type Tab = "overview" | "applications" | "records";
+type DbStatus = "checking" | "connected" | "disconnected";
+
 const OWNER_SESSION_KEY = "vva_owner_authenticated";
 const OWNER_AUTH_EVENT = "vva_owner_auth_changed";
 const getOwnerAuthSnapshot = () => typeof window !== "undefined" && window.sessionStorage.getItem(OWNER_SESSION_KEY) === "true";
@@ -37,15 +40,38 @@ export default function OwnerDashboardPage() {
   const [attendance, setAttendance] = useState<AttendanceRecord>(emptyAttendance);
   const [schedule, setSchedule] = useState<ScheduleRecord>(emptySchedule);
   const [message, setMessage] = useState("");
+  const [dbStatus, setDbStatus] = useState<DbStatus>("checking");
 
   useEffect(() => {
+    async function checkConnection() {
+      if (!supabase) {
+        setDbStatus("disconnected");
+        return;
+      }
+      try {
+        const { error } = await supabase.from("student_accounts").select("application_id").limit(1);
+        if (error) {
+          console.error("Supabase connection check error:", error);
+          setDbStatus("disconnected");
+        } else {
+          setDbStatus("connected");
+        }
+      } catch {
+        setDbStatus("disconnected");
+      }
+    }
+
     async function loadData() {
+      await checkConnection();
       const apps = await getSavedApplications();
       const accounts = await getStudentAccounts();
       setApplications(apps);
       setStudentAccounts(accounts);
     }
-    loadData();
+
+    if (authenticated) {
+      loadData();
+    }
   }, [authenticated]);
 
   const selectedAccount = selectedApplication ? studentAccounts.find((account) => account.applicationId === selectedApplication.id || account.studentId === selectedApplication.id) : undefined;
@@ -98,7 +124,7 @@ export default function OwnerDashboardPage() {
     setStudentAccounts((items) => [account, ...items.filter((item) => item.applicationId !== account.applicationId && item.studentId !== account.studentId)]);
     const updatedRecords = await getStudentPortalRecords(account.studentId);
     setRecords(updatedRecords);
-    setMessage(`Account Generated! Active across all devices: ${account.studentId} / ${account.password}`);
+    setMessage(`Account Generated! Credentials active: ${account.studentId} / ${account.password}`);
     window.setTimeout(() => setMessage(""), 5000);
     setTab("records");
   };
@@ -253,10 +279,33 @@ export default function OwnerDashboardPage() {
       </header>
 
       <main className="mx-auto max-w-7xl space-y-6 p-4 sm:p-8">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-indigo-400">Academy operations</p>
-          <h1 className="mt-2 text-2xl font-bold text-white">Teacher control center</h1>
-          <p className="mt-1 text-sm text-slate-400">Update student results, attendance, and timetable from one place.</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-indigo-400">Academy operations</p>
+            <h1 className="mt-2 text-2xl font-bold text-white">Teacher control center</h1>
+            <p className="mt-1 text-sm text-slate-400">Update student results, attendance, and timetable from one place.</p>
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            {dbStatus === "checking" && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-medium text-slate-300">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
+                Checking Supabase...
+              </span>
+            )}
+            {dbStatus === "connected" && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-950/40 px-3 py-1 text-xs font-semibold text-emerald-300">
+                <Wifi className="h-3.5 w-3.5 text-emerald-400" />
+                Cloud Synced (Supabase Active)
+              </span>
+            )}
+            {dbStatus === "disconnected" && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/40 bg-rose-950/40 px-3 py-1 text-xs font-semibold text-rose-300" title="Missing Supabase Env Variables or SQL Table Policy Error">
+                <WifiOff className="h-3.5 w-3.5 text-rose-400" />
+                LocalStorage Only (Cloud Offline)
+              </span>
+            )}
+          </div>
         </div>
 
         <nav className="flex flex-wrap gap-2 border-b border-slate-800 pb-3">
