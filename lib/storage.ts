@@ -123,9 +123,7 @@ import { AdmissionsApplication, StudentAccount, Assignment } from "./types";
 import { mockApplications } from "./mockData";
 
 export async function getSavedApplications(): Promise<AdmissionsApplication[]> {
-  if (typeof window === "undefined") {
-    return mockApplications;
-  }
+  if (typeof window === "undefined") return mockApplications;
   try {
     const { data, error } = await supabase
       .from("applications")
@@ -172,7 +170,7 @@ export async function saveApplication(app: AdmissionsApplication): Promise<void>
       const next = [app, ...list.filter((i) => i.id !== app.id)];
       localStorage.setItem("vva_admissions_apps", JSON.stringify(next));
     } catch (e) {
-      console.error("Local storage error:", e);
+      console.error("Storage error:", e);
     }
   }
 
@@ -199,7 +197,7 @@ export async function saveApplication(app: AdmissionsApplication): Promise<void>
       statement_of_purpose: app.statementOfPurpose,
     });
   } catch (e) {
-    console.error("Supabase Save Error:", e);
+    console.error("Supabase error:", e);
   }
 }
 
@@ -209,9 +207,7 @@ export async function findApplicationById(id: string): Promise<AdmissionsApplica
 }
 
 export async function getStudentAccounts(): Promise<StudentAccount[]> {
-  if (typeof window === "undefined") {
-    return [];
-  }
+  if (typeof window === "undefined") return [];
   try {
     const { data, error } = await supabase.from("student_accounts").select("*");
     if (error || !data) {
@@ -240,7 +236,7 @@ export async function saveStudentAccount(account: StudentAccount): Promise<void>
       const next = [account, ...list.filter((i) => i.applicationId !== account.applicationId)];
       localStorage.setItem("vva_student_accounts", JSON.stringify(next));
     } catch (e) {
-      console.error("Local storage error:", e);
+      console.error("Storage error:", e);
     }
   }
 
@@ -254,7 +250,7 @@ export async function saveStudentAccount(account: StudentAccount): Promise<void>
       created_at: account.createdAt,
     });
   } catch (e) {
-    console.error("Supabase Save Error:", e);
+    console.error("Supabase error:", e);
   }
 }
 
@@ -262,9 +258,7 @@ export async function getStudentAssignments(
   studentId: string,
   defaultList: Assignment[]
 ): Promise<Assignment[]> {
-  if (typeof window === "undefined") {
-    return defaultList;
-  }
+  if (typeof window === "undefined") return defaultList;
   try {
     const raw = localStorage.getItem(`vva_assignments_${studentId}`);
     return raw ? JSON.parse(raw) : defaultList;
@@ -281,7 +275,7 @@ export async function saveStudentAssignments(
     try {
       localStorage.setItem(`vva_assignments_${studentId}`, JSON.stringify(assignments));
     } catch (e) {
-      console.error("Local storage error:", e);
+      console.error("Storage error:", e);
     }
   }
 }
