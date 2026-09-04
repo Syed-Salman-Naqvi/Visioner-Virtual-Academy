@@ -1,7 +1,9 @@
+import { supabase } from "./supabase";
+
 export interface AcademicResult {
   id: string;
-  course: string;
   code: string;
+  course: string;
   score: string;
   grade: string;
   feedback: string;
@@ -29,101 +31,108 @@ export interface PortalRecords {
   schedule: ScheduleRecord[];
 }
 
-export const DEFAULT_PORTAL_RECORDS: PortalRecords = {
+export const defaultPortalRecords: PortalRecords = {
   results: [
-    { id: "result-phy", code: "PHY-9702", course: "Cambridge AS-Level Physics", score: "94%", grade: "A*", feedback: "Excellent rotational mechanics work." },
-    { id: "result-mat", code: "MAT-9709", course: "Pure Mathematics 1 & 3", score: "91%", grade: "A*", feedback: "Consistent accuracy in integration proofs." },
-    { id: "result-cs", code: "CS-9618", course: "Computer Science A-Level", score: "96%", grade: "A*", feedback: "Strong algorithmic problem solving." },
-    { id: "result-eng", code: "ENG-8021", course: "English General Paper", score: "87%", grade: "A", feedback: "Thoughtful critical analysis." },
+    { id: "res-1", code: "CS101", course: "Computer Science", score: "92%", grade: "A*", feedback: "Exceptional problem solving skills." },
+    { id: "res-2", code: "MATH201", course: "Pure Mathematics", score: "88%", grade: "A", feedback: "Strong analytical thinking." },
+    { id: "res-3", code: "PHY101", course: "Physics", score: "85%", grade: "A", feedback: "Great grasp of mechanics." },
   ],
   attendance: [
-    { id: "attendance-1", date: "Aug 23, 2026", course: "Cambridge AS-Level Physics", status: "Present" },
-    { id: "attendance-2", date: "Aug 23, 2026", course: "Pure Mathematics P1 & P3", status: "Present" },
-    { id: "attendance-3", date: "Aug 22, 2026", course: "Computer Science A-Level", status: "Present" },
-    { id: "attendance-4", date: "Aug 20, 2026", course: "English General Paper", status: "Present" },
-    { id: "attendance-5", date: "Aug 19, 2026", course: "Advanced Chemistry", status: "Late" },
+    { id: "att-1", date: "2026-09-01", course: "Computer Science", status: "Present" },
+    { id: "att-2", date: "2026-09-02", course: "Pure Mathematics", status: "Present" },
+    { id: "att-3", date: "2026-09-03", course: "Physics", status: "Present" },
   ],
   schedule: [
-    { id: "schedule-1", day: "Monday", time: "09:00 - 10:15 GST", course: "Cambridge AS Physics", topic: "Rotational dynamics and torque", teacher: "Dr. Sarah Jenkins" },
-    { id: "schedule-2", day: "Monday", time: "10:45 - 12:00 GST", course: "Pure Mathematics P1 & P3", topic: "Integration by substitution", teacher: "Prof. Mark Thompson" },
-    { id: "schedule-3", day: "Monday", time: "13:00 - 14:15 GST", course: "Computer Science A-Level", topic: "Binary trees and graph traversal", teacher: "Eng. Alex Chen" },
-    { id: "schedule-4", day: "Tuesday", time: "09:00 - 10:15 GST", course: "Advanced Chemistry", topic: "Thermodynamics and reaction kinetics", teacher: "Dr. Alistair Ross" },
-    { id: "schedule-5", day: "Tuesday", time: "10:45 - 12:00 GST", course: "Cambridge AS Physics", topic: "Electric fields and capacitance", teacher: "Dr. Sarah Jenkins" },
-    { id: "schedule-6", day: "Wednesday", time: "09:00 - 10:30 GST", course: "Pure Mathematics Mechanics", topic: "Friction on inclined planes", teacher: "Prof. Mark Thompson" },
-    { id: "schedule-7", day: "Wednesday", time: "11:00 - 12:30 GST", course: "Computer Science Lab", topic: "SQL database normalization", teacher: "Eng. Alex Chen" },
-    { id: "schedule-8", day: "Thursday", time: "09:30 - 11:00 GST", course: "Cambridge AS Physics Lab", topic: "Diffraction and interference", teacher: "Dr. Sarah Jenkins" },
-    { id: "schedule-9", day: "Friday", time: "09:00 - 10:15 GST", course: "Pure Mathematics Workshop", topic: "Past paper practice", teacher: "Prof. Mark Thompson" },
+    { id: "sch-1", day: "Monday", time: "09:00 AM - 10:30 AM", course: "Computer Science", topic: "Data Structures & Algorithms", teacher: "Dr. Aris" },
+    { id: "sch-2", day: "Tuesday", time: "11:00 AM - 12:30 PM", course: "Pure Mathematics", topic: "Calculus & Derivatives", teacher: "Prof. Sarah" },
+    { id: "sch-3", day: "Wednesday", time: "01:30 PM - 03:00 PM", course: "Physics", topic: "Quantum Mechanics Intro", teacher: "Dr. K. Vance" },
   ],
 };
 
-const PORTAL_RECORDS_KEY = "vva_portal_records";
-const STUDENT_RECORDS_KEY = "vva_student_portal_records";
-const PORTAL_RECORDS_EVENT = "vva_portal_records_changed";
-let cachedRawRecords: string | null = null;
-let cachedRecords: PortalRecords = DEFAULT_PORTAL_RECORDS;
-const EMPTY_STUDENT_RECORDS: PortalRecords = { results: [], attendance: [], schedule: [] };
-const studentRecordsCache = new Map<string, { raw: string | null; records: PortalRecords }>();
-
 export function getPortalRecords(): PortalRecords {
-  if (typeof window === "undefined") return DEFAULT_PORTAL_RECORDS;
-  try {
-    const saved = window.localStorage.getItem(PORTAL_RECORDS_KEY);
-    if (saved === cachedRawRecords) return cachedRecords;
-    cachedRawRecords = saved;
-    cachedRecords = saved ? JSON.parse(saved) as PortalRecords : DEFAULT_PORTAL_RECORDS;
-    return cachedRecords;
-  } catch {
-    cachedRawRecords = null;
-    cachedRecords = DEFAULT_PORTAL_RECORDS;
-    return cachedRecords;
+  if (typeof window !== "undefined") {
+    try {
+      const raw = localStorage.getItem("vva_portal_records");
+      return raw ? JSON.parse(raw) : defaultPortalRecords;
+    } catch {
+      return defaultPortalRecords;
+    }
   }
+  return defaultPortalRecords;
 }
 
 export function savePortalRecords(records: PortalRecords): void {
-  if (typeof window === "undefined") return;
-  const serialized = JSON.stringify(records);
-  cachedRawRecords = serialized;
-  cachedRecords = records;
-  window.localStorage.setItem(PORTAL_RECORDS_KEY, serialized);
-  window.dispatchEvent(new Event(PORTAL_RECORDS_EVENT));
-}
-
-export function subscribeToPortalRecords(onChange: () => void): () => void {
-  window.addEventListener(PORTAL_RECORDS_EVENT, onChange);
-  window.addEventListener("storage", onChange);
-  return () => {
-    window.removeEventListener(PORTAL_RECORDS_EVENT, onChange);
-    window.removeEventListener("storage", onChange);
-  };
-}
-
-export function getStudentPortalRecords(studentId: string): PortalRecords {
-  if (typeof window === "undefined") return EMPTY_STUDENT_RECORDS;
-  try {
-    const raw = window.localStorage.getItem(STUDENT_RECORDS_KEY);
-    const cached = studentRecordsCache.get(studentId);
-    if (cached?.raw === raw) return cached.records;
-    const allRecords = raw ? JSON.parse(raw) as Record<string, PortalRecords> : {};
-    const records = allRecords[studentId] || EMPTY_STUDENT_RECORDS;
-    studentRecordsCache.set(studentId, { raw, records });
-    return records;
-  } catch {
-    return EMPTY_STUDENT_RECORDS;
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem("vva_portal_records", JSON.stringify(records));
+    } catch (e) {
+      console.error("Storage error:", e);
+    }
   }
 }
 
-export function saveStudentPortalRecords(studentId: string, records: PortalRecords): void {
-  if (typeof window === "undefined") return;
-  const raw = window.localStorage.getItem(STUDENT_RECORDS_KEY);
-  const allRecords = raw ? JSON.parse(raw) as Record<string, PortalRecords> : {};
-  allRecords[studentId] = records;
-  window.localStorage.setItem(STUDENT_RECORDS_KEY, JSON.stringify(allRecords));
-  studentRecordsCache.set(studentId, { raw: JSON.stringify(allRecords), records });
-  window.dispatchEvent(new Event(PORTAL_RECORDS_EVENT));
+export async function getStudentPortalRecords(studentId: string): Promise<PortalRecords> {
+  const cleanId = (studentId || "").trim().toUpperCase();
+
+  if (supabase && cleanId) {
+    try {
+      const { data, error } = await supabase
+        .from("portal_records")
+        .select("records")
+        .eq("student_id", cleanId)
+        .maybeSingle();
+
+      if (!error && data && data.records) {
+        return data.records as PortalRecords;
+      }
+    } catch (e) {
+      console.error("Supabase fetch portal records error:", e);
+    }
+  }
+
+  if (typeof window !== "undefined" && cleanId) {
+    try {
+      const raw = localStorage.getItem(`vva_student_portal_records_${cleanId}`);
+      if (raw) return JSON.parse(raw);
+    } catch (e) {
+      console.error("LocalStorage fetch portal records error:", e);
+    }
+  }
+
+  return defaultPortalRecords;
 }
 
-export function migrateStudentPortalRecords(fromKey: string, toKey: string): PortalRecords {
-  const records = getStudentPortalRecords(fromKey);
-  saveStudentPortalRecords(toKey, records);
-  return records;
+export async function saveStudentPortalRecords(studentId: string, records: PortalRecords): Promise<void> {
+  const cleanId = (studentId || "").trim().toUpperCase();
+  if (!cleanId) return;
+
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(`vva_student_portal_records_${cleanId}`, JSON.stringify(records));
+    } catch (e) {
+      console.error("LocalStorage save portal records error:", e);
+    }
+  }
+
+  if (supabase) {
+    try {
+      const { error } = await supabase.from("portal_records").upsert({
+        student_id: cleanId,
+        records: records,
+        updated_at: new Date().toISOString(),
+      });
+      if (error) console.error("Supabase portal records upsert error:", error);
+    } catch (e) {
+      console.error("Supabase save portal records error:", e);
+    }
+  }
+}
+
+export async function migrateStudentPortalRecords(oldKey: string, newStudentId: string): Promise<void> {
+  const cleanOld = (oldKey || "").trim().toUpperCase();
+  const cleanNew = (newStudentId || "").trim().toUpperCase();
+  if (!cleanOld || !cleanNew) return;
+
+  const existing = await getStudentPortalRecords(cleanOld);
+  await saveStudentPortalRecords(cleanNew, existing);
 }
