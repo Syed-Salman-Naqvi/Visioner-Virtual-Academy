@@ -257,17 +257,35 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
+    const cleanId = studentId.trim().toUpperCase();
+    const cleanPassword = password.trim();
+
     try {
       const accounts = await getStudentAccounts();
       const match = accounts.find(
         (acc) =>
-          acc.studentId.trim().toUpperCase() === studentId.trim().toUpperCase() &&
-          acc.password === password
+          acc?.studentId &&
+          acc.studentId.trim().toUpperCase() === cleanId &&
+          acc.password?.trim() === cleanPassword
       );
 
-      if (match) {
+      // Check generated accounts or fallback demo credentials
+      if (match || (cleanId === "VVA-STU-8842" && cleanPassword === "123123")) {
+        const activeId = match ? match.studentId : "VVA-STU-8842";
+        const accountData = match || {
+          applicationId: "APP-8842",
+          studentId: "VVA-STU-8842",
+          password: "123123",
+          studentName: "Aiden Vance",
+          studentEmail: "aiden.vance@example.com",
+          createdAt: "2026-08-15",
+        };
+
         if (typeof window !== "undefined") {
-          window.sessionStorage.setItem("vva_student_account", JSON.stringify(match));
+          window.sessionStorage.setItem("vva_student_authenticated", "true");
+          window.sessionStorage.setItem("vva_active_student_id", activeId);
+          window.sessionStorage.setItem("vva_student_account", JSON.stringify(accountData));
+          window.dispatchEvent(new Event("vva_student_auth_changed"));
         }
         router.push("/student");
       } else {
