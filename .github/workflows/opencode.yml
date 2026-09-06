@@ -1,14 +1,19 @@
 name: OpenCode Analysis
 
 on:
+  issue_comment:
+    types: [created]
   push:
-    branches: [ "main", "developer" ]
-  pull_request:
     branches: [ "main" ]
 
 jobs:
   opencode:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
