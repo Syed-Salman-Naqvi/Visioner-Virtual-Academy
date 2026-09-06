@@ -49,7 +49,6 @@ export async function getStudentAccountsFromCloud(): Promise<StudentAccount[]> {
       }))
       .filter((acc) => acc.studentId || acc.applicationId);
 
-    // Update local cache with cloud data
     persistLocalStudentAccounts(accounts);
     return accounts;
   } catch (e) {
@@ -60,7 +59,6 @@ export async function getStudentAccountsFromCloud(): Promise<StudentAccount[]> {
 
 /**
  * Save student account to BOTH cloud and local storage
- * Ensures data persists and syncs across all devices
  */
 export async function saveStudentAccountToCloud(
   account: StudentAccount
@@ -80,10 +78,8 @@ export async function saveStudentAccountToCloud(
     lastSyncedAt: new Date().toISOString(),
   };
 
-  // Always save to local first (for offline support)
   persistLocalStudentAccounts([normalizedAccount]);
 
-  // Then sync to cloud
   if (!supabase) {
     return { success: false };
   }
@@ -109,7 +105,6 @@ export async function saveStudentAccountToCloud(
 
     if (error) {
       console.error("Supabase upsert error:", error);
-      // Try alternative conflict resolution
       return retryWithAlternativeConflict(normalizedAccount);
     }
 
@@ -129,7 +124,6 @@ async function retryWithAlternativeConflict(
   if (!supabase) return { success: false };
 
   try {
-    // Try with application_id conflict
     const { data, error } = await supabase
       .from("student_accounts")
       .upsert(
@@ -149,7 +143,6 @@ async function retryWithAlternativeConflict(
 
     if (!error && data) return { success: true, accountId: data.id };
 
-    // If both fail, try insert as new
     const { data: insertData, error: insertError } = await supabase
       .from("student_accounts")
       .insert({
@@ -173,7 +166,6 @@ async function retryWithAlternativeConflict(
 
 /**
  * Find account by student ID or application ID
- * Queries cloud first, then local
  */
 export async function findStudentAccount(
   searchId: string
@@ -182,7 +174,7 @@ export async function findStudentAccount(
   if (!normalized) return null;
 
   const allAccounts = await getStudentAccountsFromCloud();
-  
+
   return (
     allAccounts.find(
       (acc) =>
@@ -206,21 +198,21 @@ export function normalizeId(value: string): string {
 /**
  * Utility: Verify password (case-insensitive)
  */
-export function verifyPassword(inputPassword: string, storedPassword: string): boolean {
+export function verifyPassword(
+  inputPassword: string,
+  storedPassword: string
+): boolean {
   if (!inputPassword || !storedPassword) return false;
   const trimmedInput = (inputPassword || "").trim();
   const trimmedStored = (storedPassword || "").trim();
-  
-  // Exact match
+
   if (trimmedInput === trimmedStored) return true;
-  
-  // Case-insensitive match
+
   if (trimmedInput.toUpperCase() === trimmedStored.toUpperCase()) return true;
-  
-  // Remove common prefixes
+
   const cleanInput = trimmedInput.replace(/^VVA[-_]?/i, "");
   const cleanStored = trimmedStored.replace(/^VVA[-_]?/i, "");
-  
+
   return cleanInput === cleanStored;
 }
 
@@ -250,7 +242,6 @@ function readLocalStudentAccounts(): StudentAccount[] {
 
 /**
  * Force sync cloud data to local
- * Call this when you suspect stale data
  */
 export async function forceSyncCloudToLocal(): Promise<StudentAccount[]> {
   const cloudAccounts = await getStudentAccountsFromCloud();
