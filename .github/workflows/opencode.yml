@@ -1,24 +1,31 @@
-name: OpenCode Analysis
+name: opencode
 
 on:
   issue_comment:
     types: [created]
-  push:
-    branches: [ "main" ]
+  pull_request_review_comment:
+    types: [created]
 
 jobs:
   opencode:
+    if: |
+      contains(github.event.comment.body, '/oc') || 
+      contains(github.event.comment.body, '/opencode')
     runs-on: ubuntu-latest
+
     permissions:
       contents: write
       issues: write
       pull-requests: write
+      id-token: write
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Run OpenCode Action
-        uses: opencode-ai/opencode-action@v1
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 1
+
+      - name: Run OpenCode
+        uses: anomalyco/opencode/github@latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
