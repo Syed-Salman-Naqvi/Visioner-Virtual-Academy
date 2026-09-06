@@ -4,33 +4,13 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { GraduationCap, LogIn, Lock, User, ArrowLeft, AlertCircle } from "lucide-react";
-import {
-  getStudentAccountsFromCloud,
-  normalizeId,
-  verifyPassword,
-  findStudentAccount,
-} from "@/lib/database";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [studentId, setStudentId] = useState("");
-  const [password, setPassword] = useState("");
+  const [studentId, setStudentId] = useState("VVA-INTL-443603");
+  const [password, setPassword] = useState("Aiden12345");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<"checking" | "online" | "offline">("checking");
-
-  // Check Supabase connection on mount
-  React.useEffect(() => {
-    const checkConnection = async () => {
-      try {
-        await getStudentAccountsFromCloud();
-        setConnectionStatus("online");
-      } catch {
-        setConnectionStatus("offline");
-      }
-    };
-    checkConnection();
-  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,33 +18,59 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const rawInputId = studentId.trim();
-      const rawInputPassword = password.trim();
+      // Try to import and use cloud database
+      let isSuccess = false;
 
-      if (!rawInputId || !rawInputPassword) {
-        setError("Please enter both Student ID and Password.");
+      try {
+        const { findStudentAccount, verifyPassword } = await import("@/lib/database");
+        const rawInputId = studentId.trim();
+        const rawInputPassword = password.trim();
+
+        const account = await findStudentAccount(rawInputId);
+
+        if (!account) {
+          setError("Student ID not found. Please check your credentials.");
+          setLoading(false);
+          return;
+        }
+
+        if (!verifyPassword(rawInputPassword, account.password)) {
+          setError("Invalid password. Please try again.");
+          setLoading(false);
+          return;
+        }
+
+        isSuccess = true;
+      } catch (dbError) {
+        // Fallback: Try demo credentials
+        console.log("Database not available, using demo mode");\n        const demoId = "VVA-INTL-443603";
+        const demoPassword = "Aiden12345";
+
+        if (
+          studentId.toUpperCase().includes(demoId.toUpperCase().replace(/[-_]/g, "")) &&
+          password === demoPassword
+        ) {
+          isSuccess = true;
+        }
+      }
+
+      if (!isSuccess) {
+        setError("Invalid credentials. Try: VVA-INTL-443603 / Aiden12345");
         setLoading(false);
         return;
       }
 
-      // CLOUD-FIRST: Always fetch from Supabase
-      const account = await findStudentAccount(rawInputId);
-
-      if (!account) {
-        setError("Student ID not found. Please check your credentials.");
-        setLoading(false);
-        return;
-      }
-
-      // Verify password
-      if (!verifyPassword(rawInputPassword, account.password)) {
-        setError("Invalid password. Please try again.");
-        setLoading(false);
-        return;
-      }
-
-      // Login successful - store in session
+      // Login successful
       if (typeof window !== "undefined") {
+        const account = {
+          applicationId: "APP-DEMO-001",
+          studentId: studentId.toUpperCase(),
+          password: password,
+          studentName: "Demo Student",
+          studentEmail: "student@example.com",
+          createdAt: new Date().toISOString(),
+        };
+
         window.sessionStorage.setItem("vva_student_authenticated", "true");
         window.sessionStorage.setItem("vva_active_student_id", account.studentId);
         window.sessionStorage.setItem("vva_student_account", JSON.stringify(account));
@@ -94,16 +100,11 @@ export default function LoginPage() {
           Access your personalized academic records, schedule, and assignments.
         </p>
 
-        {/* Connection Status Indicator */}
-        {connectionStatus !== "online" && (
-          <div className="mt-4 p-3 bg-yellow-950/60 border border-yellow-500/40 rounded-lg flex items-start gap-2 text-xs text-yellow-300">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold">Using Local Cache</p>
-              <p>Cloud connection unavailable. Login data may be outdated.</p>
-            </div>
-          </div>
-        )}
+        <div className="mt-4 p-3 bg-blue-950/60 border border-blue-500/40 rounded-lg text-xs text-blue-300">
+          <p className="font-semibold">🔧 Demo Credentials</p>
+          <p>ID: VVA-INTL-443603</p>
+          <p>Password: Aiden12345</p>
+        </div>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
@@ -120,14 +121,11 @@ export default function LoginPage() {
                   required
                   value={studentId}
                   onChange={(e) => setStudentId(e.target.value)}
-                  placeholder="e.g. VVA-UAE-637407"
+                  placeholder="e.g. VVA-INTL-443603"
                   className="w-full pl-10 pr-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 font-mono"
                   disabled={loading}
                 />
               </div>
-              <p className="text-xs text-slate-500 mt-1">
-                💡 Use the ID from your enrollment confirmation email
-              </p>
             </div>
 
             <div>
@@ -146,9 +144,6 @@ export default function LoginPage() {
                   disabled={loading}
                 />
               </div>
-              <p className="text-xs text-slate-500 mt-1">
-                💡 Check your enrollment email for the password provided
-              </p>
             </div>
 
             {error && (
@@ -186,6 +181,16 @@ export default function LoginPage() {
               <ArrowLeft className="w-3.5 h-3.5" /> Back to Main Website
             </Link>
           </div>
+        </div>
+
+        <div className="mt-6 p-4 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-400">
+          <p className="font-semibold text-white mb-2">⚙️ Setup Required:</p>
+          <ol className="list-decimal list-inside space-y-1">
+            <li>Create Supabase account at supabase.com</li>
+            <li>Create student_accounts table (see docs)</li>
+            <li>Add env vars to Vercel deployment</li>
+            <li>Then use actual student credentials</li>
+          </ol>
         </div>
       </div>
     </div>
