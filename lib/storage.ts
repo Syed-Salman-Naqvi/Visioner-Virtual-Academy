@@ -217,3 +217,10 @@ export async function saveStudentAssignments(studentId: string, assignments: Ass
     }
   }
 }
+
+export function studentIdsMatch(id1?: string, id2?: string): boolean {
+  if (!id1 || !id2) return false;
+  const clean1 = id1.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const clean2 = id2.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return clean1 === clean2 || clean1.includes(clean2) || clean2.includes(clean1);
+}
