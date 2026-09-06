@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { BarChart3, CalendarDays, CheckCircle2, GraduationCap, LogIn, LogOut, Save, Wifi, WifiOff, Loader2 } from "lucide-react";
-import { getSavedApplications, getStudentAccounts, saveApplication, saveStudentAccount, studentIdsMatch } from "@/lib/storage";
+import { getSavedApplications, getStudentAccounts, saveApplication, saveStudentAccount } from "@/lib/storage";
 import { AdmissionsApplication, StudentAccount } from "@/lib/types";
 import { AcademicResult, AttendanceRecord, PortalRecords, ScheduleRecord, getPortalRecords, getStudentPortalRecords, migrateStudentPortalRecords, savePortalRecords, saveStudentPortalRecords } from "@/lib/portalData";
 import { supabase } from "@/lib/supabase";
@@ -75,11 +75,7 @@ export default function OwnerDashboardPage() {
   }, [authenticated]);
 
   const selectedAccount = selectedApplication
-    ? studentAccounts.find(
-        (account) =>
-          studentIdsMatch(account.applicationId, selectedApplication.id) ||
-          studentIdsMatch(account.studentId, selectedApplication.id)
-      )
+    ? studentAccounts.find((account) => account.applicationId === selectedApplication.id || account.studentId === selectedApplication.id)
     : undefined;
   const selectedRecordKey = selectedApplication ? (selectedAccount?.studentId || selectedApplication.id) : "";
 
@@ -104,9 +100,7 @@ export default function OwnerDashboardPage() {
 
   const selectApplication = async (application: AdmissionsApplication) => {
     setSelectedApplication(application);
-    const account = studentAccounts.find(
-      (item) => studentIdsMatch(item.applicationId, application.id) || studentIdsMatch(item.studentId, application.id)
-    );
+    const account = studentAccounts.find((item) => item.applicationId === application.id || item.studentId === application.id);
     const targetId = account ? account.studentId : application.id;
     const recs = await getStudentPortalRecords(targetId);
     setRecords(recs);
@@ -117,7 +111,7 @@ export default function OwnerDashboardPage() {
 
   const generateStudentAccount = async () => {
     if (!selectedApplication) return;
-    const appId = selectedApplication.id.trim().toUpperCase();
+    const appId = selectedApplication.id.trim();
     const newPassword = `VVA${Math.floor(100000 + Math.random() * 900000)}`;
     const account: StudentAccount = {
       applicationId: appId,
@@ -125,20 +119,21 @@ export default function OwnerDashboardPage() {
       password: newPassword,
       studentName: selectedApplication.studentName,
       studentEmail: selectedApplication.studentEmail,
-      createdAt: new Date().toISOString(),
+      createdAt: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
     };
-    const cloudSynced = await saveStudentAccount(account);
+
+    await saveStudentAccount(account);
     await migrateStudentPortalRecords(selectedApplication.id, account.studentId);
-    const refreshedAccounts = await getStudentAccounts();
-    setStudentAccounts(refreshedAccounts);
+    
+    setStudentAccounts((items) => [
+      account,
+      ...items.filter((item) => item.applicationId !== account.applicationId && item.studentId !== account.studentId),
+    ]);
+
     const updatedRecords = await getStudentPortalRecords(account.studentId);
     setRecords(updatedRecords);
-    setMessage(
-      cloudSynced
-        ? `Account generated and synced. Credentials: ${account.studentId} / ${account.password}`
-        : `Account saved locally, but cloud sync failed. Credentials: ${account.studentId} / ${account.password}. Cross-device login will not work until Supabase accepts the upsert.`
-    );
-    window.setTimeout(() => setMessage(""), 8000);
+    setMessage(`Account Generated! Credentials active: ${account.studentId} / ${account.password}`);
+    window.setTimeout(() => setMessage(""), 5000);
     setTab("records");
   };
 
@@ -362,21 +357,6 @@ export default function OwnerDashboardPage() {
               <strong className="mt-3 block text-2xl text-white">{records.schedule.length}</strong>
               <span className="text-xs text-slate-400">Scheduled classes</span>
             </button>
-          </div>
-        )}
-
-        {tab === "overview" && (
-          <div className="rounded-2xl border border-indigo-500/30 bg-indigo-950/20 p-5">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-300">Active student</p>
-                <h2 className="mt-1 text-base font-bold text-white">Aiden Vance</h2>
-                <p className="mt-1 text-xs text-slate-400">Student ID: VVA-STU-8842 • Cambridge AS-Level • Year 12</p>
-              </div>
-              <button onClick={() => setTab("records")} className="rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-500">
-                Open student records
-              </button>
-            </div>
           </div>
         )}
 
