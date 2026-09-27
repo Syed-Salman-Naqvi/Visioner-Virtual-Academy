@@ -44,6 +44,16 @@ export default function OwnerDashboardPage() {
   const [message, setMessage] = useState("");
   const [dbStatus, setDbStatus] = useState<DbStatus>("checking");
 
+
+  useEffect(() => {
+  async function fetchApps() {
+    const apps = await getSavedApplications();
+    setApplications(apps);
+  }
+  fetchApps();
+}, []);
+
+
   useEffect(() => {
     async function checkConnection() {
       if (!supabase) {
@@ -91,6 +101,10 @@ export default function OwnerDashboardPage() {
     setMessage("Saved and synced to student portal.");
     window.setTimeout(() => setMessage(""), 2500);
   };
+
+  
+
+
 
   const updateStatus = async (status: AdmissionsApplication["status"]) => {
     if (!selectedApplication) return;

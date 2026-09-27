@@ -20,6 +20,17 @@ export default function LoginPage() {
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
+  e.preventDefault();
+  const account = await findStudentAccount(studentId, password);
+  if (account) {
+    // redirect to student portal
+  } else {
+    // show error
+  }
+};
+
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);

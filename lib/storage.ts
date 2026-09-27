@@ -1,133 +1,80 @@
-import { AdmissionsApplication, Assignment, ChatMessage, StudentAccount } from "./types";
-import { DEFAULT_STUDENT_ACCOUNTS, initializeDefaultAccounts } from "./seed-data";
+import { AdmissionsApplication, StudentAccount, Assignment, ChatMessage } from "./types";
+import { supabase } from './supabase';
 
-const APPS_STORAGE_KEY = "vva_admissions_applications";
-const ASSIGNMENTS_STORAGE_KEY = "vva_student_assignments";
-const CHAT_STORAGE_KEY = "vva_tutor_chat_history";
-const STUDENT_ACCOUNTS_STORAGE_KEY = "vva_student_accounts";
+// ==================== ADMISSIONS APPLICATIONS ====================
 
-export function getSavedApplications(): AdmissionsApplication[] {
-  if (typeof window === "undefined") return [];
+export async function getSavedApplications(): Promise<AdmissionsApplication[]> {
   try {
-    const raw = localStorage.getItem(APPS_STORAGE_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw);
+    const { data, error } = await supabase.from('admissions').select('*');
+    if (error) {
+      console.error("Supabase fetch error:", error);
+      return [];
+    }
+    return (data || []).map((row: any) => row.raw_data || row);
   } catch (e) {
-    console.error("Failed to load applications from localStorage", e);
+    console.error("Failed to load applications", e);
     return [];
   }
 }
 
-export function saveApplication(app: AdmissionsApplication): void {
-  if (typeof window === "undefined") return;
+export async function saveApplication(app: AdmissionsApplication): Promise<void> {
   try {
-    const existing = getSavedApplications();
-    const updated = [app, ...existing.filter((a) => a.id !== app.id)];
-    localStorage.setItem(APPS_STORAGE_KEY, JSON.stringify(updated));
+    const { error } = await supabase.from('admissions').upsert({
+      id: app.id,
+      student_name: app.studentName || app.fullName,
+      email: app.email,
+      phone: app.phone,
+      status: app.status || 'pending',
+      raw_data: app
+    });
+    if (error) console.error("Supabase save application error:", error);
   } catch (e) {
-    console.error("Failed to save application", e);
+    console.error("Failed to save application to Supabase", e);
   }
 }
 
-export function findApplicationById(id: string): AdmissionsApplication | undefined {
-  const apps = getSavedApplications();
+export async function findApplicationById(id: string): Promise<AdmissionsApplication | undefined> {
+  const apps = await getSavedApplications();
   const cleanId = id.trim().toUpperCase();
   return apps.find((a) => a.id.toUpperCase() === cleanId);
 }
 
-export function getStudentAccounts(): StudentAccount[] {
-  if (typeof window === "undefined") return [];
-  
-  // Initialize default accounts on first load
-  initializeDefaultAccounts();
-  
+// ==================== STUDENT ACCOUNTS ====================
+
+export async function getStudentAccounts(): Promise<StudentAccount[]> {
   try {
-    const raw = localStorage.getItem(STUDENT_ACCOUNTS_STORAGE_KEY);
-    const accounts = raw ? JSON.parse(raw) : [];
-    
-    // If no accounts exist after initialization attempt, return defaults
-    if (accounts.length === 0) {
-      return DEFAULT_STUDENT_ACCOUNTS;
+    const { data, error } = await supabase.from('student_accounts').select('*');
+    if (error) {
+      console.error("Supabase fetch student accounts error:", error);
+      return [];
     }
-    
-    return accounts;
-  } catch {
-    return DEFAULT_STUDENT_ACCOUNTS;
-  }
-}
-
-export function saveStudentAccount(account: StudentAccount): void {
-  if (typeof window === "undefined") return;
-  const updated = [account, ...getStudentAccounts().filter((item) => item.applicationId !== account.applicationId && item.studentId !== account.studentId)];
-  localStorage.setItem(STUDENT_ACCOUNTS_STORAGE_KEY, JSON.stringify(updated));
-}
-
-export function findStudentAccount(studentId: string, password: string): StudentAccount | undefined {
-  const trimmedStudentId = studentId.trim();
-  const trimmedPassword = password.trim();
-  return getStudentAccounts().find(
-    (account) => 
-      account.studentId.toLowerCase() === trimmedStudentId.toLowerCase() && 
-      account.password === trimmedPassword
-  );
-}
-
-export function getSavedAssignments(defaultList: Assignment[]): Assignment[] {
-  if (typeof window === "undefined") return defaultList;
-  try {
-    const raw = localStorage.getItem(ASSIGNMENTS_STORAGE_KEY);
-    if (!raw) return defaultList;
-    return JSON.parse(raw);
-  } catch {
-    return defaultList;
-  }
-}
-
-export function updateAssignmentStatus(id: string, newStatus: "pending" | "submitted" | "graded"): Assignment[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(ASSIGNMENTS_STORAGE_KEY);
-    const list: Assignment[] = raw ? JSON.parse(raw) : [];
-    const updated = list.map((item) => (item.id === id ? { ...item, status: newStatus } : item));
-    localStorage.setItem(ASSIGNMENTS_STORAGE_KEY, JSON.stringify(updated));
-    return updated;
+    return (data || []).map((row: any) => row.raw_data || row);
   } catch {
     return [];
   }
 }
 
-export function getStudentAssignments(studentId: string, defaultList: Assignment[]): Assignment[] {
-  if (typeof window === "undefined") return defaultList;
+export async function saveStudentAccount(account: StudentAccount): Promise<void> {
   try {
-    const raw = localStorage.getItem(`${ASSIGNMENTS_STORAGE_KEY}_${studentId}`);
-    return raw ? JSON.parse(raw) : defaultList;
-  } catch {
-    return defaultList;
-  }
-}
-
-export function saveStudentAssignments(studentId: string, assignments: Assignment[]): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(`${ASSIGNMENTS_STORAGE_KEY}_${studentId}`, JSON.stringify(assignments));
-}
-
-export function getSavedChat(): ChatMessage[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(CHAT_STORAGE_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
-}
-
-export function appendChatMessage(msg: ChatMessage): void {
-  if (typeof window === "undefined") return;
-  try {
-    const existing = getSavedChat();
-    localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify([...existing, msg]));
+    const { error } = await supabase.from('student_accounts').upsert({
+      id: account.studentId,
+      student_id: account.studentId,
+      password: account.password,
+      application_id: account.applicationId,
+      student_name: account.studentName,
+      raw_data: account
+    });
+    if (error) console.error("Supabase save student account error:", error);
   } catch (e) {
-    console.error(e);
+    console.error("Failed to save student account to Supabase", e);
   }
+}
+
+export async function findStudentAccount(studentId: string, password: string): Promise<StudentAccount | undefined> {
+  const accounts = await getStudentAccounts();
+  return accounts.find(
+    (account) =>
+      account.studentId?.toLowerCase() === studentId.trim().toLowerCase() &&
+      account.password === password
+  );
 }

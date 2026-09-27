@@ -1200,6 +1200,12 @@ export default function AdmissionsPage() {
     "AI & Data Science",
   ];
 
+  const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  await saveApplication(newApplication);
+  // ...
+};
+
   const handleSubjectToggle = (subj: string) => {
     setFormData((prev) => ({
       ...prev,
