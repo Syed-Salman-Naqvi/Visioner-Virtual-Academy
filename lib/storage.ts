@@ -1,4 +1,5 @@
 import { AdmissionsApplication, Assignment, ChatMessage, StudentAccount } from "./types";
+import { DEFAULT_STUDENT_ACCOUNTS, initializeDefaultAccounts } from "./seed-data";
 
 const APPS_STORAGE_KEY = "vva_admissions_applications";
 const ASSIGNMENTS_STORAGE_KEY = "vva_student_assignments";
@@ -36,11 +37,22 @@ export function findApplicationById(id: string): AdmissionsApplication | undefin
 
 export function getStudentAccounts(): StudentAccount[] {
   if (typeof window === "undefined") return [];
+  
+  // Initialize default accounts on first load
+  initializeDefaultAccounts();
+  
   try {
     const raw = localStorage.getItem(STUDENT_ACCOUNTS_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const accounts = raw ? JSON.parse(raw) : [];
+    
+    // If no accounts exist after initialization attempt, return defaults
+    if (accounts.length === 0) {
+      return DEFAULT_STUDENT_ACCOUNTS;
+    }
+    
+    return accounts;
   } catch {
-    return [];
+    return DEFAULT_STUDENT_ACCOUNTS;
   }
 }
 
