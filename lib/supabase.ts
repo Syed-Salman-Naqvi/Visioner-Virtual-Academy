@@ -7,3 +7,7 @@ export const supabase: SupabaseClient | null =
   supabaseUrl && supabaseAnonKey && supabaseUrl.startsWith("http")
     ? createClient(supabaseUrl, supabaseAnonKey)
     : null;
+
+export const isSupabaseConfigured = () => {
+  return Boolean(supabase && supabaseUrl && supabaseAnonKey);
+};
