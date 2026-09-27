@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { GraduationCap, LogIn, Lock, User, ArrowLeft } from "lucide-react";
 import { getStudentAccounts } from "@/lib/storage";
+import { initializeDefaultAccounts } from "@/lib/seed-data";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,6 +13,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Initialize default accounts on component mount
+  useEffect(() => {
+    initializeDefaultAccounts();
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { BarChart3, CalendarDays, CheckCircle2, GraduationCap, LogIn, LogOut, Save, Wifi, WifiOff, Loader2 } from "lucide-react";
 import { getSavedApplications, getStudentAccounts, saveApplication, saveStudentAccount } from "@/lib/storage";
 import { AdmissionsApplication, StudentAccount } from "@/lib/types";
@@ -27,6 +28,7 @@ const emptyAttendance: AttendanceRecord = { id: "", date: "", course: "", status
 const emptySchedule: ScheduleRecord = { id: "", day: "Monday", time: "", course: "", topic: "", teacher: "" };
 
 export default function OwnerDashboardPage() {
+  const router = useRouter();
   const authenticated = useSyncExternalStore(subscribeToOwnerAuth, getOwnerAuthSnapshot, () => false);
   const [ownerId, setOwnerId] = useState("");
   const [ownerPassword, setOwnerPassword] = useState("");
@@ -111,6 +113,14 @@ export default function OwnerDashboardPage() {
 
   const generateStudentAccount = async () => {
     if (!selectedApplication) return;
+    
+    const existingAccount = studentAccounts.find((item) => item.applicationId === selectedApplication.id);
+    if (existingAccount) {
+      setMessage("Account already exists for this application.");
+      window.setTimeout(() => setMessage(""), 3000);
+      return;
+    }
+    
     const appId = selectedApplication.id.trim();
     const newPassword = `VVA${Math.floor(100000 + Math.random() * 900000)}`;
     const account: StudentAccount = {
@@ -135,6 +145,8 @@ export default function OwnerDashboardPage() {
     setMessage(`Account Generated! Credentials active: ${account.studentId} / ${account.password}`);
     window.setTimeout(() => setMessage(""), 5000);
     setTab("records");
+    setMessage(`Account created! Student ID: ${account.studentId} | Password: ${account.password}`);
+    window.setTimeout(() => setMessage(""), 10000);
   };
 
   const editResult = (item: AcademicResult) => setResult(item);
@@ -192,10 +204,12 @@ export default function OwnerDashboardPage() {
 
   const handleOwnerLogin = (event: React.FormEvent) => {
     event.preventDefault();
-    if (ownerId === "Muhammad-Salman" && ownerPassword === "123123") {
+    if (ownerId.trim() === "Muhammad-Salman" && ownerPassword.trim() === "123123") {
       window.sessionStorage.setItem(OWNER_SESSION_KEY, "true");
       setLoginError("");
       window.dispatchEvent(new Event(OWNER_AUTH_EVENT));
+      setApplications(getSavedApplications());
+      setStudentAccounts(getStudentAccounts());
       return;
     }
     setLoginError("The ID or password is incorrect.");
@@ -206,6 +220,9 @@ export default function OwnerDashboardPage() {
     window.dispatchEvent(new Event(OWNER_AUTH_EVENT));
     setOwnerId("");
     setOwnerPassword("");
+    setLoginError("");
+    setSelectedApplication(null);
+    router.push("/login");
   };
 
   if (!authenticated) {

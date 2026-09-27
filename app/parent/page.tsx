@@ -20,7 +20,7 @@ export default function ParentPortalPage() {
 
     try {
       const res = await findApplicationById(searchId);
-      setApplication(res);
+      setApplication(res || null);
     } catch {
       setApplication(null);
     } finally {
