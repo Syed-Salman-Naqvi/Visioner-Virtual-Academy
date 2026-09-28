@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import { getSavedApplications } from './storage';
 
 export interface AcademicResult {
-  id?: string;
+  id: string;
   subject?: string;
   code?: string;
   course?: string;
@@ -14,7 +14,7 @@ export interface AcademicResult {
 }
 
 export interface AttendanceRecord {
-  id?: string;
+  id: string;
   subject?: string;
   course?: string;
   date?: string;
@@ -47,10 +47,10 @@ export interface AssignmentRecord {
 }
 
 export interface StudentInfoRecord {
-  id?: string;
-  name?: string;
-  email?: string;
-  program?: string;
+  id: string;
+  name: string;
+  email: string;
+  program: string;
   avatar?: string;
   enrolledDate?: string;
   status?: string;
@@ -58,23 +58,23 @@ export interface StudentInfoRecord {
 }
 
 export interface StatsRecord {
-  averagePerformance?: string;
-  pendingHomework?: number;
-  classAttendance?: string;
-  activeSubjectsCount?: number;
+  averagePerformance: string;
+  pendingHomework: number;
+  classAttendance: string;
+  activeSubjectsCount: number;
   [key: string]: any;
 }
 
 export interface PortalRecords {
-  studentInfo?: StudentInfoRecord;
-  stats?: StatsRecord;
-  recentResults?: AcademicResult[];
-  results?: AcademicResult[];
-  pendingAssignments?: AssignmentRecord[];
-  assignments?: AssignmentRecord[];
-  timetable?: ScheduleRecord[];
-  schedule?: ScheduleRecord[];
-  attendance?: AttendanceRecord[];
+  studentInfo: StudentInfoRecord;
+  stats: StatsRecord;
+  recentResults: AcademicResult[];
+  results: AcademicResult[];
+  pendingAssignments: AssignmentRecord[];
+  assignments: AssignmentRecord[];
+  timetable: ScheduleRecord[];
+  schedule: ScheduleRecord[];
+  attendance: AttendanceRecord[];
   [key: string]: any;
 }
 
@@ -179,22 +179,52 @@ export const createDynamicStudentProfile = (studentInfo: {
 const PORTAL_STORAGE_KEY = 'vva_portal_records_db';
 
 export function getPortalRecords(studentId?: string, extra?: any): PortalRecords {
+  const fallback = createDynamicStudentProfile({
+    id: studentId || 'VVA-STU',
+    name: 'Enrolled Student',
+    email: '',
+  });
+
   if (typeof window === 'undefined') {
-    return createDynamicStudentProfile({ id: 'VVA-STU', name: 'Enrolled Student', email: '' });
+    return fallback;
   }
+
   try {
     const data = localStorage.getItem(PORTAL_STORAGE_KEY);
     if (data) {
       const parsed = JSON.parse(data);
+      let target: any = null;
+
       if (studentId && parsed[studentId]) {
-        return parsed[studentId];
+        target = parsed[studentId];
+      } else if (parsed.studentInfo) {
+        target = parsed;
+      } else if (typeof parsed === 'object') {
+        const keys = Object.keys(parsed);
+        if (keys.length > 0 && parsed[keys[0]]?.studentInfo) {
+          target = parsed[keys[0]];
+        }
       }
-      return parsed;
+
+      if (target) {
+        return {
+          studentInfo: target.studentInfo || fallback.studentInfo,
+          stats: target.stats || fallback.stats,
+          recentResults: target.recentResults || target.results || fallback.recentResults,
+          results: target.results || target.recentResults || fallback.results,
+          pendingAssignments: target.pendingAssignments || target.assignments || fallback.pendingAssignments,
+          assignments: target.assignments || target.pendingAssignments || fallback.assignments,
+          timetable: target.timetable || target.schedule || fallback.timetable,
+          schedule: target.schedule || target.timetable || fallback.schedule,
+          attendance: target.attendance || fallback.attendance,
+        };
+      }
     }
   } catch (err) {
     console.error('Error reading portal records:', err);
   }
-  return createDynamicStudentProfile({ id: studentId || 'VVA-STU', name: 'Enrolled Student', email: '' });
+
+  return fallback;
 }
 
 export function savePortalRecords(records?: any, extra?: any): void {
@@ -209,25 +239,7 @@ export function savePortalRecords(records?: any, extra?: any): void {
 }
 
 export function getStudentPortalRecords(studentId: string, extra?: any): PortalRecords {
-  const allRecords = getPortalRecords();
-  if (allRecords && allRecords[studentId]) {
-    const existing = allRecords[studentId];
-    return {
-      ...existing,
-      results: existing.results || existing.recentResults || [],
-      recentResults: existing.recentResults || existing.results || [],
-      attendance: existing.attendance || [],
-      schedule: existing.schedule || existing.timetable || [],
-      timetable: existing.timetable || existing.schedule || [],
-      assignments: existing.assignments || existing.pendingAssignments || [],
-      pendingAssignments: existing.pendingAssignments || existing.assignments || [],
-    };
-  }
-  return createDynamicStudentProfile({
-    id: studentId || 'VVA-STU',
-    name: 'Enrolled Student',
-    email: '',
-  });
+  return getPortalRecords(studentId, extra);
 }
 
 export function saveStudentPortalRecords(studentId: string, records: PortalRecords, extra?: any): void {
@@ -237,40 +249,39 @@ export function saveStudentPortalRecords(studentId: string, records: PortalRecor
 }
 
 export function migrateStudentPortalRecords(studentId?: string, extra?: any): PortalRecords {
-  const allRecords = getPortalRecords();
-  if (studentId && !allRecords[studentId]) {
-    const newProfile = createDynamicStudentProfile({
-      id: studentId,
-      name: 'Enrolled Student',
-      email: '',
-    });
-    allRecords[studentId] = newProfile;
-    savePortalRecords(allRecords);
-    return newProfile;
-  }
-  return allRecords;
+  return getPortalRecords(studentId, extra);
 }
 
 export async function getStudentPortalData(studentId: string, sessionUser?: any): Promise<PortalRecords> {
   const activeId = studentId || sessionUser?.id || sessionUser?.studentId || 'VVA-STU';
   const activeName = sessionUser?.name || sessionUser?.studentName;
 
-  const allSaved = getPortalRecords();
-  if (allSaved && allSaved[activeId]) {
-    const saved = allSaved[activeId];
-    if (activeName && saved.studentInfo) {
-      saved.studentInfo.name = activeName;
+  if (typeof window !== 'undefined') {
+    try {
+      const data = localStorage.getItem(PORTAL_STORAGE_KEY);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (parsed[activeId]) {
+          const saved = parsed[activeId];
+          if (activeName && saved.studentInfo) {
+            saved.studentInfo.name = activeName;
+          }
+          return {
+            studentInfo: saved.studentInfo || { id: activeId, name: activeName || 'Enrolled Student', email: '', program: 'Sindh Board (Grade 11)', avatar: '/default-avatar.png', enrolledDate: new Date().toLocaleDateString(), status: 'Active' },
+            stats: saved.stats || { averagePerformance: '88%', pendingHomework: 2, classAttendance: '100%', activeSubjectsCount: 3 },
+            recentResults: saved.recentResults || saved.results || [],
+            results: saved.results || saved.recentResults || [],
+            pendingAssignments: saved.pendingAssignments || saved.assignments || [],
+            assignments: saved.assignments || saved.pendingAssignments || [],
+            timetable: saved.timetable || saved.schedule || [],
+            schedule: saved.schedule || saved.timetable || [],
+            attendance: saved.attendance || [],
+          };
+        }
+      }
+    } catch (e) {
+      // Continue
     }
-    return {
-      ...saved,
-      results: saved.results || saved.recentResults || [],
-      recentResults: saved.recentResults || saved.results || [],
-      attendance: saved.attendance || [],
-      schedule: saved.schedule || saved.timetable || [],
-      timetable: saved.timetable || saved.schedule || [],
-      assignments: saved.assignments || saved.pendingAssignments || [],
-      pendingAssignments: saved.pendingAssignments || saved.assignments || [],
-    };
   }
 
   try {
