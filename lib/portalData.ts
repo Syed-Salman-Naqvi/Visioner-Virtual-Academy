@@ -1,49 +1,48 @@
 import { supabase } from './supabase';
 import { getSavedApplications } from './storage';
 
-// Flexible interfaces required by app/owner/page.tsx and app/student/page.tsx
 export interface AcademicResult {
-  id?: string;
-  subject?: string;
-  code?: string;
-  course?: string;
-  score?: string;
-  grade?: string;
-  status?: string;
-  feedback?: string;
+  id: string;
+  subject: string;
+  code: string;
+  course: string;
+  score: string;
+  grade: string;
+  status: string;
+  feedback: string;
   [key: string]: any;
 }
 
 export interface AttendanceRecord {
-  id?: string;
-  subject?: string;
-  course?: string;
-  date?: string;
-  totalClasses?: number;
-  attended?: number;
-  percentage?: string;
-  status?: string;
+  id: string;
+  subject: string;
+  course: string;
+  date: string;
+  totalClasses: number;
+  attended: number;
+  percentage: string;
+  status: string;
   [key: string]: any;
 }
 
 export interface ScheduleRecord {
-  id?: string;
-  day?: string;
-  time?: string;
-  subject?: string;
-  course?: string;
-  teacher?: string;
+  id: string;
+  day: string;
+  time: string;
+  subject: string;
+  course: string;
+  teacher: string;
   room?: string;
   [key: string]: any;
 }
 
 export interface AssignmentRecord {
-  id?: string;
-  subjectCode?: string;
-  subject?: string;
-  title?: string;
-  dueDate?: string;
-  status?: string;
+  id: string;
+  subjectCode: string;
+  subject: string;
+  title: string;
+  dueDate: string;
+  status: string;
   [key: string]: any;
 }
 
@@ -67,19 +66,18 @@ export interface StatsRecord {
 }
 
 export interface PortalRecords {
-  studentInfo?: StudentInfoRecord | any;
-  stats?: StatsRecord | any;
-  recentResults?: AcademicResult[];
-  results?: AcademicResult[];
-  pendingAssignments?: AssignmentRecord[];
-  assignments?: AssignmentRecord[];
-  timetable?: ScheduleRecord[];
-  schedule?: ScheduleRecord[];
-  attendance?: AttendanceRecord[];
+  studentInfo: StudentInfoRecord;
+  stats: StatsRecord;
+  recentResults: AcademicResult[];
+  results: AcademicResult[];
+  pendingAssignments: AssignmentRecord[];
+  assignments: AssignmentRecord[];
+  timetable: ScheduleRecord[];
+  schedule: ScheduleRecord[];
+  attendance: AttendanceRecord[];
   [key: string]: any;
 }
 
-// Dynamic Profile Generator (Uses student's real name, email, program, ID)
 export const createDynamicStudentProfile = (studentInfo: {
   id: string;
   name: string;
@@ -180,7 +178,6 @@ export const createDynamicStudentProfile = (studentInfo: {
 
 const PORTAL_STORAGE_KEY = 'vva_portal_records_db';
 
-// Multi-argument compatible storage helpers for app/owner/page.tsx
 export function getPortalRecords(studentId?: string, extra?: any): Record<string, PortalRecords> {
   if (typeof window === 'undefined') return {};
   try {
@@ -206,7 +203,17 @@ export function savePortalRecords(records?: any, extra?: any): void {
 export function getStudentPortalRecords(studentId: string, extra?: any): PortalRecords {
   const allRecords = getPortalRecords();
   if (allRecords[studentId]) {
-    return allRecords[studentId];
+    const existing = allRecords[studentId];
+    return {
+      ...existing,
+      results: existing.results || existing.recentResults || [],
+      recentResults: existing.recentResults || existing.results || [],
+      attendance: existing.attendance || [],
+      schedule: existing.schedule || existing.timetable || [],
+      timetable: existing.timetable || existing.schedule || [],
+      assignments: existing.assignments || existing.pendingAssignments || [],
+      pendingAssignments: existing.pendingAssignments || existing.assignments || [],
+    };
   }
   return createDynamicStudentProfile({
     id: studentId || 'VVA-STU',
@@ -234,22 +241,28 @@ export function migrateStudentPortalRecords(studentId?: string, extra?: any): Re
   return allRecords;
 }
 
-// Primary portal data query function
 export async function getStudentPortalData(studentId: string, sessionUser?: any): Promise<PortalRecords> {
   const activeId = studentId || sessionUser?.id || sessionUser?.studentId || 'VVA-STU';
   const activeName = sessionUser?.name || sessionUser?.studentName;
 
-  // 1. Check local saved portal records
   const allSaved = getPortalRecords();
   if (allSaved[activeId]) {
     const saved = allSaved[activeId];
     if (activeName && saved.studentInfo) {
       saved.studentInfo.name = activeName;
     }
-    return saved;
+    return {
+      ...saved,
+      results: saved.results || saved.recentResults || [],
+      recentResults: saved.recentResults || saved.results || [],
+      attendance: saved.attendance || [],
+      schedule: saved.schedule || saved.timetable || [],
+      timetable: saved.timetable || saved.schedule || [],
+      assignments: saved.assignments || saved.pendingAssignments || [],
+      pendingAssignments: saved.pendingAssignments || saved.assignments || [],
+    };
   }
 
-  // 2. Query Supabase 'students' table
   try {
     const { data: dbStudent } = await supabase
       .from('students')
@@ -271,7 +284,6 @@ export async function getStudentPortalData(studentId: string, sessionUser?: any)
     // Continue
   }
 
-  // 3. Query Supabase 'applications' table
   try {
     const { data: dbApp } = await supabase
       .from('applications')
@@ -293,7 +305,6 @@ export async function getStudentPortalData(studentId: string, sessionUser?: any)
     // Continue
   }
 
-  // 4. Query LocalStorage applications
   try {
     const localApps = getSavedApplications();
     if (Array.isArray(localApps)) {
@@ -319,7 +330,6 @@ export async function getStudentPortalData(studentId: string, sessionUser?: any)
     // Continue
   }
 
-  // 5. Session user fallback
   if (sessionUser && (sessionUser.name || sessionUser.studentName)) {
     const profile = createDynamicStudentProfile({
       id: activeId,
@@ -331,7 +341,6 @@ export async function getStudentPortalData(studentId: string, sessionUser?: any)
     return profile;
   }
 
-  // 6. Generic fallback
   const profile = createDynamicStudentProfile({
     id: activeId,
     name: activeName || 'Enrolled Student',
