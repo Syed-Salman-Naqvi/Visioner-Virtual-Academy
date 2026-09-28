@@ -1,609 +1,3 @@
-// "use client";
-
-// import React, { useState, useEffect, useSyncExternalStore } from "react";
-// import Link from "next/link";
-// import { useRouter } from "next/navigation";
-// import { BarChart3, CalendarDays, CheckCircle2, GraduationCap, LogIn, LogOut, Save, Wifi, WifiOff, Loader2 } from "lucide-react";
-// import { getSavedApplications, getStudentAccounts, saveApplication, saveStudentAccount } from "@/lib/storage";
-// import { AdmissionsApplication, StudentAccount } from "@/lib/types";
-// import { AcademicResult, AttendanceRecord, PortalRecords, ScheduleRecord, getPortalRecords, getStudentPortalRecords, migrateStudentPortalRecords, savePortalRecords, saveStudentPortalRecords } from "@/lib/portalData";
-// import { supabase } from "@/lib/supabase";
-
-// type Tab = "overview" | "applications" | "records";
-// type DbStatus = "checking" | "connected" | "disconnected";
-
-// const OWNER_SESSION_KEY = "vva_owner_authenticated";
-// const OWNER_AUTH_EVENT = "vva_owner_auth_changed";
-// const getOwnerAuthSnapshot = () => typeof window !== "undefined" && window.sessionStorage.getItem(OWNER_SESSION_KEY) === "true";
-// const subscribeToOwnerAuth = (onChange: () => void) => {
-//   window.addEventListener(OWNER_AUTH_EVENT, onChange);
-//   window.addEventListener("storage", onChange);
-//   return () => {
-//     window.removeEventListener(OWNER_AUTH_EVENT, onChange);
-//     window.removeEventListener("storage", onChange);
-//   };
-// };
-// const emptyResult: AcademicResult = { id: "", code: "", course: "", score: "", grade: "", feedback: "" };
-// const emptyAttendance: AttendanceRecord = { id: "", date: "", course: "", status: "Present" };
-// const emptySchedule: ScheduleRecord = { id: "", day: "Monday", time: "", course: "", topic: "", teacher: "" };
-
-// export default function OwnerDashboardPage() {
-//   const router = useRouter();
-//   const authenticated = useSyncExternalStore(subscribeToOwnerAuth, getOwnerAuthSnapshot, () => false);
-//   const [ownerId, setOwnerId] = useState("");
-//   const [ownerPassword, setOwnerPassword] = useState("");
-//   const [loginError, setLoginError] = useState("");
-//   const [tab, setTab] = useState<Tab>("overview");
-//   const [applications, setApplications] = useState<AdmissionsApplication[]>([]);
-//   const [selectedApplication, setSelectedApplication] = useState<AdmissionsApplication | null>(null);
-//   const [studentAccounts, setStudentAccounts] = useState<StudentAccount[]>([]);
-//   const [records, setRecords] = useState<PortalRecords>(() => getPortalRecords());
-//   const [result, setResult] = useState<AcademicResult>(emptyResult);
-//   const [attendance, setAttendance] = useState<AttendanceRecord>(emptyAttendance);
-//   const [schedule, setSchedule] = useState<ScheduleRecord>(emptySchedule);
-//   const [message, setMessage] = useState("");
-//   const [dbStatus, setDbStatus] = useState<DbStatus>("checking");
-
-
-//   useEffect(() => {
-//   async function loadData() {
-//     const apps = await getSavedApplications();
-//     setApplications(apps);
-//     const accounts = await getStudentAccounts();
-//     setStudentAccounts(accounts);
-//   }
-//   loadData();
-// }, []);
-
-
-//   useEffect(() => {
-//     async function checkConnection() {
-//       if (!supabase) {
-//         setDbStatus("disconnected");
-//         return;
-//       }
-//       try {
-//         const { error } = await supabase.from("student_accounts").select("application_id").limit(1);
-//         if (error) {
-//           console.error("Supabase connection check error:", error);
-//           setDbStatus("disconnected");
-//         } else {
-//           setDbStatus("connected");
-//         }
-//       } catch {
-//         setDbStatus("disconnected");
-//       }
-//     }
-
-//     async function loadData() {
-//       await checkConnection();
-//       const apps = await getSavedApplications();
-//       const accounts = await getStudentAccounts();
-//       setApplications(apps);
-//       setStudentAccounts(accounts);
-//     }
-
-//     if (authenticated) {
-//       loadData();
-//     }
-//   }, [authenticated]);
-
-//   const selectedAccount = selectedApplication
-//     ? studentAccounts.find((account) => account.applicationId === selectedApplication.id || account.studentId === selectedApplication.id)
-//     : undefined;
-//   const selectedRecordKey = selectedApplication ? (selectedAccount?.studentId || selectedApplication.id) : "";
-
-//   const updateRecords = async (next: PortalRecords) => {
-//     setRecords(next);
-//     if (selectedRecordKey) {
-//       await saveStudentPortalRecords(selectedRecordKey, next);
-//     } else {
-//       savePortalRecords(next);
-//     }
-//     setMessage("Saved and synced to student portal.");
-//     window.setTimeout(() => setMessage(""), 2500);
-//   };
-
-  
-
-
-
-//   const updateStatus = async (status: AdmissionsApplication["status"]) => {
-//     if (!selectedApplication) return;
-//     const next = { ...selectedApplication, status };
-//     await saveApplication(next);
-//     setApplications((items) => items.map((item) => item.id === next.id ? next : item));
-//     setSelectedApplication(next);
-//   };
-
-//   const selectApplication = async (application: AdmissionsApplication) => {
-//     setSelectedApplication(application);
-//     const account = studentAccounts.find((item) => item.applicationId === application.id || item.studentId === application.id);
-//     const targetId = account ? account.studentId : application.id;
-//     const recs = await getStudentPortalRecords(targetId);
-//     setRecords(recs);
-//     setResult(emptyResult);
-//     setAttendance(emptyAttendance);
-//     setSchedule(emptySchedule);
-//   };
-
-//   const generateStudentAccount = async () => {
-//     if (!selectedApplication) return;
-    
-//     const existingAccount = studentAccounts.find((item) => item.applicationId === selectedApplication.id);
-//     if (existingAccount) {
-//       setMessage("Account already exists for this application.");
-//       window.setTimeout(() => setMessage(""), 3000);
-//       return;
-//     }
-    
-//     const appId = selectedApplication.id.trim();
-//     const newPassword = `VVA${Math.floor(100000 + Math.random() * 900000)}`;
-//     const account: StudentAccount = {
-//       applicationId: appId,
-//       studentId: appId,
-//       password: newPassword,
-//       studentName: selectedApplication.studentName,
-//       studentEmail: selectedApplication.studentEmail,
-//       createdAt: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-//     };
-
-//     await saveStudentAccount(account);
-//     await migrateStudentPortalRecords(selectedApplication.id, account.studentId);
-    
-//     setStudentAccounts((items) => [
-//       account,
-//       ...items.filter((item) => item.applicationId !== account.applicationId && item.studentId !== account.studentId),
-//     ]);
-
-//     const updatedRecords = await getStudentPortalRecords(account.studentId);
-//     setRecords(updatedRecords);
-//     setMessage(`Account Generated! Credentials active: ${account.studentId} / ${account.password}`);
-//     window.setTimeout(() => setMessage(""), 5000);
-//     setTab("records");
-//     setMessage(`Account created! Student ID: ${account.studentId} | Password: ${account.password}`);
-//     window.setTimeout(() => setMessage(""), 10000);
-//   };
-
-//   const editResult = (item: AcademicResult) => setResult(item);
-//   const saveResult = (event: React.FormEvent) => {
-//     event.preventDefault();
-//     if (!result.course || !result.score) return;
-//     const item = { ...result, id: result.id || `result-${Date.now()}` };
-//     updateRecords({
-//       ...records,
-//       results: records.results.some((old) => old.id === item.id)
-//         ? records.results.map((old) => (old.id === item.id ? item : old))
-//         : [...records.results, item],
-//     });
-//     setResult(emptyResult);
-//   };
-
-//   const editAttendance = (item: AttendanceRecord) => setAttendance(item);
-//   const saveAttendance = (event: React.FormEvent) => {
-//     event.preventDefault();
-//     if (!attendance.course || !attendance.date) return;
-//     const item = { ...attendance, id: attendance.id || `attendance-${Date.now()}` };
-//     updateRecords({
-//       ...records,
-//       attendance: records.attendance.some((old) => old.id === item.id)
-//         ? records.attendance.map((old) => (old.id === item.id ? item : old))
-//         : [...records.attendance, item],
-//     });
-//     setAttendance(emptyAttendance);
-//   };
-
-//   const editSchedule = (item: ScheduleRecord) => setSchedule(item);
-//   const saveSchedule = (event: React.FormEvent) => {
-//     event.preventDefault();
-//     if (!schedule.course || !schedule.time) return;
-//     const item = { ...schedule, id: schedule.id || `schedule-${Date.now()}` };
-//     updateRecords({
-//       ...records,
-//       schedule: records.schedule.some((old) => old.id === item.id)
-//         ? records.schedule.map((old) => (old.id === item.id ? item : old))
-//         : [...records.schedule, item],
-//     });
-//     setSchedule(emptySchedule);
-//   };
-
-//   const field = (label: string, value: string, onChange: (value: string) => void) => (
-//     <label className="block text-xs text-slate-400">
-//       {label}
-//       <input
-//         value={value}
-//         onChange={(event) => onChange(event.target.value)}
-//         className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white"
-//       />
-//     </label>
-//   );
-
-//   const handleOwnerLogin = async (event: React.FormEvent) => {
-//   event.preventDefault();
-//   if (ownerId.trim() === "Muhammad-Salman" && ownerPassword.trim() === "123123") {
-//     window.sessionStorage.setItem(OWNER_SESSION_KEY, "true");
-//     setLoginError("");
-//     window.dispatchEvent(new Event(OWNER_AUTH_EVENT));
-
-//     const apps = await getSavedApplications();
-//     const accounts = await getStudentAccounts();
-//     setApplications(apps);
-//     setStudentAccounts(accounts);
-//     return;
-//   }
-//   setLoginError("The ID or password is incorrect.");
-// };
-
-//   const signOut = () => {
-//     window.sessionStorage.removeItem(OWNER_SESSION_KEY);
-//     window.dispatchEvent(new Event(OWNER_AUTH_EVENT));
-//     setOwnerId("");
-//     setOwnerPassword("");
-//     setLoginError("");
-//     setSelectedApplication(null);
-//     router.push("/login");
-//   };
-
-//   if (!authenticated) {
-//     return (
-//       <div className="flex min-h-screen items-center justify-center bg-slate-950 p-4 text-slate-100">
-//         <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl sm:p-8">
-//           <Link href="/" className="mx-auto flex w-fit items-center gap-3">
-//             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600">
-//               <GraduationCap className="h-5 w-5" />
-//             </span>
-//             <span>
-//               <strong className="block text-sm text-white">Visioner Academy</strong>
-//               <small className="text-[10px] uppercase text-indigo-400">Teacher / Owner</small>
-//             </span>
-//           </Link>
-//           <div className="mt-8 text-center">
-//             <h1 className="text-xl font-bold text-white">Owner dashboard sign in</h1>
-//             <p className="mt-2 text-xs text-slate-400">Enter your authorized academy ID and password.</p>
-//           </div>
-//           <form onSubmit={handleOwnerLogin} className="mt-6 space-y-4">
-//             <label className="block text-xs font-semibold text-slate-300">
-//               Owner ID
-//               <input
-//                 required
-//                 value={ownerId}
-//                 onChange={(event) => setOwnerId(event.target.value)}
-//                 autoComplete="username"
-//                 className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-sm text-white focus:border-indigo-500 focus:outline-none"
-//                 placeholder="Enter owner ID"
-//               />
-//             </label>
-//             <label className="block text-xs font-semibold text-slate-300">
-//               Password
-//               <input
-//                 required
-//                 type="password"
-//                 value={ownerPassword}
-//                 onChange={(event) => setOwnerPassword(event.target.value)}
-//                 autoComplete="current-password"
-//                 className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-sm text-white focus:border-indigo-500 focus:outline-none"
-//                 placeholder="Enter password"
-//               />
-//             </label>
-//             {loginError && <p role="alert" className="text-xs text-rose-400">{loginError}</p>}
-//             <button
-//               type="submit"
-//               className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white hover:bg-indigo-500"
-//             >
-//               <LogIn className="h-4 w-4" />
-//               Sign in to dashboard
-//             </button>
-//           </form>
-//           <Link href="/login" className="mt-5 block text-center text-xs text-indigo-400 hover:text-indigo-300">
-//             Back to portal login
-//           </Link>
-//         </div>
-//       </div>
-//     );
-//   }
-
-//   return (
-//     <div className="min-h-screen bg-slate-950 text-slate-100">
-//       <header className="border-b border-slate-800 bg-slate-900 px-4 py-4 sm:px-8">
-//         <div className="mx-auto flex max-w-7xl items-center justify-between">
-//           <Link href="/" className="flex items-center gap-3">
-//             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600">
-//               <GraduationCap className="h-5 w-5" />
-//             </span>
-//             <span>
-//               <strong className="block text-sm text-white">Visioner Academy</strong>
-//               <small className="text-[10px] uppercase text-indigo-400">Teacher / Owner</small>
-//             </span>
-//           </Link>
-//           <button onClick={signOut} className="flex items-center gap-2 text-xs text-slate-400 hover:text-white">
-//             <LogOut className="h-4 w-4" />
-//             Sign out
-//           </button>
-//         </div>
-//       </header>
-
-//       <main className="mx-auto max-w-7xl space-y-6 p-4 sm:p-8">
-//         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-//           <div>
-//             <p className="text-xs font-semibold uppercase tracking-wider text-indigo-400">Academy operations</p>
-//             <h1 className="mt-2 text-2xl font-bold text-white">Teacher control center</h1>
-//             <p className="mt-1 text-sm text-slate-400">Update student results, attendance, and timetable from one place.</p>
-//           </div>
-
-//           <div className="flex items-center gap-2 self-start sm:self-auto">
-//             {dbStatus === "checking" && (
-//               <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-medium text-slate-300">
-//                 <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
-//                 Checking Supabase...
-//               </span>
-//             )}
-//             {dbStatus === "connected" && (
-//               <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-950/40 px-3 py-1 text-xs font-semibold text-emerald-300">
-//                 <Wifi className="h-3.5 w-3.5 text-emerald-400" />
-//                 Cloud Synced (Supabase Active)
-//               </span>
-//             )}
-//             {dbStatus === "disconnected" && (
-//               <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/40 bg-rose-950/40 px-3 py-1 text-xs font-semibold text-rose-300" title="Missing Supabase Env Variables or SQL Table Policy Error">
-//                 <WifiOff className="h-3.5 w-3.5 text-rose-400" />
-//                 LocalStorage Only (Cloud Offline)
-//               </span>
-//             )}
-//           </div>
-//         </div>
-
-//         <nav className="flex flex-wrap gap-2 border-b border-slate-800 pb-3">
-//           {[
-//             { key: "overview", label: "Overview" },
-//             { key: "applications", label: "Applications" },
-//             { key: "records", label: "Academic records" },
-//           ].map((item) => (
-//             <button
-//               key={item.key}
-//               onClick={() => setTab(item.key as Tab)}
-//               className={`rounded-lg px-4 py-2 text-xs font-semibold ${
-//                 tab === item.key ? "bg-indigo-600 text-white" : "bg-slate-900 text-slate-400 hover:text-white"
-//               }`}
-//             >
-//               {item.label}
-//             </button>
-//           ))}
-//         </nav>
-
-//         {message && (
-//           <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/30 px-4 py-3 text-xs text-emerald-300">
-//             {message}
-//           </div>
-//         )}
-
-//         {tab === "overview" && (
-//           <div className="grid gap-4 sm:grid-cols-3">
-//             <button onClick={() => setTab("records")} className="rounded-2xl border border-slate-800 bg-slate-900 p-5 text-left">
-//               <BarChart3 className="h-5 w-5 text-indigo-400" />
-//               <strong className="mt-3 block text-2xl text-white">{records.results.length}</strong>
-//               <span className="text-xs text-slate-400">Published results</span>
-//             </button>
-//             <button onClick={() => setTab("records")} className="rounded-2xl border border-slate-800 bg-slate-900 p-5 text-left">
-//               <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-//               <strong className="mt-3 block text-2xl text-white">{records.attendance.length}</strong>
-//               <span className="text-xs text-slate-400">Attendance records</span>
-//             </button>
-//             <button onClick={() => setTab("records")} className="rounded-2xl border border-slate-800 bg-slate-900 p-5 text-left">
-//               <CalendarDays className="h-5 w-5 text-amber-400" />
-//               <strong className="mt-3 block text-2xl text-white">{records.schedule.length}</strong>
-//               <span className="text-xs text-slate-400">Scheduled classes</span>
-//             </button>
-//           </div>
-//         )}
-
-//         {tab === "applications" && (
-//           <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-//             <div className="space-y-3">
-//               {applications.map((item) => (
-//                 <button
-//                   key={item.id}
-//                   onClick={() => selectApplication(item)}
-//                   className={`w-full rounded-2xl border p-4 text-left ${
-//                     selectedApplication?.id === item.id ? "border-indigo-500 bg-indigo-950/20" : "border-slate-800 bg-slate-900"
-//                   }`}
-//                 >
-//                   <div className="flex justify-between">
-//                     <strong className="text-sm text-white">{item.studentName}</strong>
-//                     <span className="text-xs text-indigo-300">{item.status}</span>
-//                   </div>
-//                   <p className="mt-1 text-xs text-slate-400">{item.id} • {item.targetTrack}</p>
-//                   <span className="mt-3 inline-block rounded-lg bg-indigo-600 px-3 py-1.5 text-[11px] font-bold text-white">
-//                     Open student records
-//                   </span>
-//                 </button>
-//               ))}
-//               {applications.length === 0 && (
-//                 <p className="rounded-2xl border border-slate-800 bg-slate-900 p-5 text-xs text-slate-400">
-//                   No applications have been submitted.
-//                 </p>
-//               )}
-//             </div>
-//             <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-//               {selectedApplication ? (
-//                 <>
-//                   <h2 className="text-base font-bold text-white">{selectedApplication.studentName}</h2>
-//                   <p className="mt-1 text-xs text-slate-400">{selectedApplication.studentEmail}</p>
-//                   <label className="mt-6 block text-xs text-slate-300">
-//                     Application status
-//                     <select
-//                       value={selectedApplication.status}
-//                       onChange={(event) => updateStatus(event.target.value as AdmissionsApplication["status"])}
-//                       className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white"
-//                     >
-//                       <option>Under Review</option>
-//                       <option>Verified</option>
-//                       <option>Interview Scheduled</option>
-//                       <option>Accepted</option>
-//                     </select>
-//                   </label>
-//                 </>
-//               ) : (
-//                 <p className="text-xs text-slate-500">Select an application to review it.</p>
-//               )}
-//             </div>
-//           </div>
-//         )}
-
-//         {tab === "applications" && selectedApplication && (
-//           <section className="rounded-2xl border border-indigo-500/30 bg-slate-900 p-5">
-//             <h2 className="text-base font-bold text-white">Complete application: {selectedApplication.studentName}</h2>
-//             <div className="mt-4 grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
-//               <p><span className="text-slate-500">Student email</span><strong className="mt-1 block break-all text-slate-200">{selectedApplication.studentEmail}</strong></p>
-//               <p><span className="text-slate-500">Parent / guardian</span><strong className="mt-1 block text-slate-200">{selectedApplication.parentName}</strong></p>
-//               <p><span className="text-slate-500">Parent email</span><strong className="mt-1 block break-all text-slate-200">{selectedApplication.parentEmail}</strong></p>
-//               <p><span className="text-slate-500">Phone number</span><strong className="mt-1 block text-slate-200">{selectedApplication.parentPhone}</strong></p>
-//               <p><span className="text-slate-500">Nationality</span><strong className="mt-1 block text-slate-200">{selectedApplication.nationality}</strong></p>
-//               <p><span className="text-slate-500">Country / city</span><strong className="mt-1 block text-slate-200">{selectedApplication.countryOfResidence} • {selectedApplication.city}</strong></p>
-//               <p><span className="text-slate-500">Date of birth</span><strong className="mt-1 block text-slate-200">{selectedApplication.dateOfBirth}</strong></p>
-//               <p><span className="text-slate-500">Program / grade</span><strong className="mt-1 block text-slate-200">{selectedApplication.targetTrack} • {selectedApplication.gradeLevel}</strong></p>
-//               <p><span className="text-slate-500">Timezone</span><strong className="mt-1 block text-slate-200">{selectedApplication.timeZone}</strong></p>
-//               <p><span className="text-slate-500">Preferred cohort</span><strong className="mt-1 block text-slate-200">{selectedApplication.preferredCohortSlot}</strong></p>
-//               <p className="lg:col-span-2"><span className="text-slate-500">Documents</span><strong className="mt-1 block text-slate-200">{selectedApplication.documentsAttached.length ? selectedApplication.documentsAttached.join(", ") : "No documents attached"}</strong></p>
-//             </div>
-//             <div className="mt-5 rounded-xl border border-indigo-500/30 bg-indigo-950/20 p-4">
-//               <div className="flex items-center justify-between gap-3">
-//                 <p className="text-xs font-semibold text-indigo-200">Student portal access</p>
-//                 <button type="button" onClick={() => setTab("records")} className="rounded-lg bg-indigo-600 px-3 py-1.5 text-[11px] font-bold text-white">
-//                   Open student records
-//                 </button>
-//               </div>
-//               {selectedAccount ? (
-//                 <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2">
-//                   <p><span className="text-slate-400">Student ID:</span> <strong className="text-white">{selectedAccount.studentId}</strong></p>
-//                   <p><span className="text-slate-400">Password:</span> <strong className="text-white">{selectedAccount.password}</strong></p>
-//                   <p className="text-[11px] text-slate-400 sm:col-span-2">Generated {selectedAccount.createdAt}. Provide these credentials to the student.</p>
-//                 </div>
-//               ) : (
-//                 <button onClick={generateStudentAccount} className="mt-3 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-500">
-//                   Generate student ID and password
-//                 </button>
-//               )}
-//             </div>
-//           </section>
-//         )}
-
-//         {tab === "records" && (
-//           <div className="space-y-8">
-//             <section>
-//               <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-white">
-//                 <BarChart3 className="h-4 w-4 text-indigo-400" />Results
-//               </h2>
-//               <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-//                 <div className="space-y-2">
-//                   {records.results.map((item) => (
-//                     <button key={item.id} onClick={() => editResult(item)} className="flex w-full items-center justify-between rounded-xl border border-slate-800 bg-slate-900 p-3 text-left">
-//                       <span>
-//                         <strong className="block text-xs text-white">{item.course}</strong>
-//                         <small className="text-slate-400">{item.code} • {item.feedback}</small>
-//                       </span>
-//                       <span className="text-xs font-bold text-emerald-400">{item.score} ({item.grade})</span>
-//                     </button>
-//                   ))}
-//                 </div>
-//                 <form onSubmit={saveResult} className="space-y-2 rounded-xl border border-slate-800 bg-slate-900 p-4">
-//                   {field("Course", result.course, (value) => setResult({ ...result, course: value }))}
-//                   {field("Course code", result.code, (value) => setResult({ ...result, code: value }))}
-//                   {field("Score", result.score, (value) => setResult({ ...result, score: value }))}
-//                   {field("Grade", result.grade, (value) => setResult({ ...result, grade: value }))}
-//                   {field("Feedback", result.feedback, (value) => setResult({ ...result, feedback: value }))}
-//                   <button className="mt-2 flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white">
-//                     <Save className="h-4 w-4" />Save result
-//                   </button>
-//                 </form>
-//               </div>
-//             </section>
-
-//             <section>
-//               <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-white">
-//                 <CheckCircle2 className="h-4 w-4 text-emerald-400" />Attendance
-//               </h2>
-//               <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-//                 <div className="space-y-2">
-//                   {records.attendance.map((item) => (
-//                     <button key={item.id} onClick={() => editAttendance(item)} className="flex w-full items-center justify-between rounded-xl border border-slate-800 bg-slate-900 p-3 text-left">
-//                       <span>
-//                         <strong className="block text-xs text-white">{item.course}</strong>
-//                         <small className="text-slate-400">{item.date}</small>
-//                       </span>
-//                       <span className={`text-xs font-bold ${item.status === "Present" ? "text-emerald-400" : item.status === "Late" ? "text-amber-400" : "text-rose-400"}`}>
-//                         {item.status}
-//                       </span>
-//                     </button>
-//                   ))}
-//                 </div>
-//                 <form onSubmit={saveAttendance} className="space-y-2 rounded-xl border border-slate-800 bg-slate-900 p-4">
-//                   {field("Course", attendance.course, (value) => setAttendance({ ...attendance, course: value }))}
-//                   {field("Date", attendance.date, (value) => setAttendance({ ...attendance, date: value }))}
-//                   <label className="block text-xs text-slate-400">
-//                     Status
-//                     <select
-//                       value={attendance.status}
-//                       onChange={(event) => setAttendance({ ...attendance, status: event.target.value as AttendanceRecord["status"] })}
-//                       className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white"
-//                     >
-//                       <option>Present</option>
-//                       <option>Late</option>
-//                       <option>Absent</option>
-//                     </select>
-//                   </label>
-//                   <button className="flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white">
-//                     <Save className="h-4 w-4" />Save attendance
-//                   </button>
-//                 </form>
-//               </div>
-//             </section>
-
-//             <section>
-//               <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-white">
-//                 <CalendarDays className="h-4 w-4 text-amber-400" />Timetable
-//               </h2>
-//               <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-//                 <div className="space-y-2">
-//                   {records.schedule.map((item) => (
-//                     <button key={item.id} onClick={() => editSchedule(item)} className="flex w-full items-center justify-between rounded-xl border border-slate-800 bg-slate-900 p-3 text-left">
-//                       <span>
-//                         <strong className="block text-xs text-white">{item.course}</strong>
-//                         <small className="text-slate-400">{item.day} • {item.time} • {item.topic}</small>
-//                       </span>
-//                     </button>
-//                   ))}
-//                 </div>
-//                 <form onSubmit={saveSchedule} className="space-y-2 rounded-xl border border-slate-800 bg-slate-900 p-4">
-//                   {field("Course", schedule.course, (value) => setSchedule({ ...schedule, course: value }))}
-//                   {field("Time", schedule.time, (value) => setSchedule({ ...schedule, time: value }))}
-//                   {field("Topic", schedule.topic, (value) => setSchedule({ ...schedule, topic: value }))}
-//                   {field("Teacher", schedule.teacher, (value) => setSchedule({ ...schedule, teacher: value }))}
-//                   <label className="block text-xs text-slate-400">
-//                     Day
-//                     <select
-//                       value={schedule.day}
-//                       onChange={(event) => setSchedule({ ...schedule, day: event.target.value as ScheduleRecord["day"] })}
-//                       className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white"
-//                     >
-//                       {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"].map((day) => (
-//                         <option key={day}>{day}</option>
-//                       ))}
-//                     </select>
-//                   </label>
-//                   <button className="flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white">
-//                     <Save className="h-4 w-4" />Save timetable
-//                   </button>
-//                 </form>
-//               </div>
-//             </section>
-//           </div>
-//         )}
-//       </main>
-//     </div>
-//   );
-// }
-
-
 "use client";
 
 import React, { useState, useEffect, useSyncExternalStore } from "react";
@@ -629,6 +23,15 @@ import {
   ShieldCheck,
   X,
   Edit3,
+  Globe,
+  MapPin,
+  Calendar,
+  Mail,
+  Phone,
+  User,
+  BookOpen,
+  File,
+  Paperclip,
 } from "lucide-react";
 import {
   getSavedApplications,
@@ -742,9 +145,16 @@ export default function OwnerDashboardPage() {
   const [gradeFeedbackInput, setGradeFeedbackInput] = useState("");
 
   const [records, setRecords] = useState<PortalRecords>(() => getPortalRecords());
+  
+  // States for Editing Academic Results, Attendance, and Schedule
   const [result, setResult] = useState<AcademicResult>(emptyResult);
+  const [editingResultId, setEditingResultId] = useState<string | null>(null);
+
   const [attendance, setAttendance] = useState<AttendanceRecord>(emptyAttendance);
+  const [editingAttendanceId, setEditingAttendanceId] = useState<string | null>(null);
+
   const [schedule, setSchedule] = useState<ScheduleRecord>(emptySchedule);
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
 
   const [message, setMessage] = useState("");
 
@@ -756,6 +166,9 @@ export default function OwnerDashboardPage() {
       setStudentAccounts(accounts);
       if (apps.length > 0 && !selectedApplication) {
         setSelectedApplication(apps[0]);
+        const account = accounts.find((a) => a.applicationId === apps[0].id || a.studentId === apps[0].id);
+        const recs = await getStudentPortalRecords(account ? account.studentId : apps[0].id);
+        setRecords(recs);
       }
       loadAssignmentsForStudent("VVA-STU-8842");
     }
@@ -786,7 +199,7 @@ export default function OwnerDashboardPage() {
     } else {
       savePortalRecords(next);
     }
-    notifyMessage("Academic records saved and synced with student portal.");
+    notifyMessage("Academic records saved & synchronized with student portal.");
   };
 
   const notifyMessage = (msg: string) => {
@@ -810,8 +223,11 @@ export default function OwnerDashboardPage() {
     const recs = await getStudentPortalRecords(targetId);
     setRecords(recs);
     setResult(emptyResult);
+    setEditingResultId(null);
     setAttendance(emptyAttendance);
+    setEditingAttendanceId(null);
     setSchedule(emptySchedule);
+    setEditingScheduleId(null);
   };
 
   const handleDeleteApplication = async (app: AdmissionsApplication) => {
@@ -826,7 +242,11 @@ export default function OwnerDashboardPage() {
 
     if (selectedApplication?.id === app.id) {
       const remaining = applications.filter((i) => i.id !== app.id);
-      setSelectedApplication(remaining.length > 0 ? remaining[0] : null);
+      if (remaining.length > 0) {
+        setSelectedApplication(remaining[0]);
+      } else {
+        setSelectedApplication(null);
+      }
     }
 
     setDeleteConfirmApp(null);
@@ -913,43 +333,100 @@ export default function OwnerDashboardPage() {
     notifyMessage("Grade and feedback published to student portal.");
   };
 
+  // Academic Results Handlers (Save, Edit, Delete)
   const saveResult = (event: React.FormEvent) => {
     event.preventDefault();
     if (!result.course || !result.score) return;
-    const item = { ...result, id: result.id || `result-${Date.now()}` };
-    updateRecords({
-      ...records,
-      results: records.results.some((old) => old.id === item.id)
-        ? records.results.map((old) => (old.id === item.id ? item : old))
-        : [...records.results, item],
-    });
+
+    if (editingResultId) {
+      const updatedResults = records.results.map((item) =>
+        item.id === editingResultId ? { ...result, id: editingResultId } : item
+      );
+      updateRecords({ ...records, results: updatedResults });
+      setEditingResultId(null);
+    } else {
+      const newItem = { ...result, id: `result-${Date.now()}` };
+      updateRecords({ ...records, results: [...records.results, newItem] });
+    }
     setResult(emptyResult);
   };
 
+  const handleEditResult = (item: AcademicResult) => {
+    setResult(item);
+    setEditingResultId(item.id);
+  };
+
+  const handleDeleteResult = (id: string) => {
+    const updatedResults = records.results.filter((item) => item.id !== id);
+    updateRecords({ ...records, results: updatedResults });
+    if (editingResultId === id) {
+      setResult(emptyResult);
+      setEditingResultId(null);
+    }
+  };
+
+  // Attendance Handlers (Save, Edit, Delete)
   const saveAttendance = (event: React.FormEvent) => {
     event.preventDefault();
     if (!attendance.course || !attendance.date) return;
-    const item = { ...attendance, id: attendance.id || `attendance-${Date.now()}` };
-    updateRecords({
-      ...records,
-      attendance: records.attendance.some((old) => old.id === item.id)
-        ? records.attendance.map((old) => (old.id === item.id ? item : old))
-        : [...records.attendance, item],
-    });
+
+    if (editingAttendanceId) {
+      const updatedAttendance = records.attendance.map((item) =>
+        item.id === editingAttendanceId ? { ...attendance, id: editingAttendanceId } : item
+      );
+      updateRecords({ ...records, attendance: updatedAttendance });
+      setEditingAttendanceId(null);
+    } else {
+      const newItem = { ...attendance, id: `attendance-${Date.now()}` };
+      updateRecords({ ...records, attendance: [...records.attendance, newItem] });
+    }
     setAttendance(emptyAttendance);
   };
 
+  const handleEditAttendance = (item: AttendanceRecord) => {
+    setAttendance(item);
+    setEditingAttendanceId(item.id);
+  };
+
+  const handleDeleteAttendance = (id: string) => {
+    const updatedAttendance = records.attendance.filter((item) => item.id !== id);
+    updateRecords({ ...records, attendance: updatedAttendance });
+    if (editingAttendanceId === id) {
+      setAttendance(emptyAttendance);
+      setEditingAttendanceId(null);
+    }
+  };
+
+  // Schedule Handlers (Save, Edit, Delete)
   const saveSchedule = (event: React.FormEvent) => {
     event.preventDefault();
     if (!schedule.course || !schedule.time) return;
-    const item = { ...schedule, id: schedule.id || `schedule-${Date.now()}` };
-    updateRecords({
-      ...records,
-      schedule: records.schedule.some((old) => old.id === item.id)
-        ? records.schedule.map((old) => (old.id === item.id ? item : old))
-        : [...records.schedule, item],
-    });
+
+    if (editingScheduleId) {
+      const updatedSchedule = records.schedule.map((item) =>
+        item.id === editingScheduleId ? { ...schedule, id: editingScheduleId } : item
+      );
+      updateRecords({ ...records, schedule: updatedSchedule });
+      setEditingScheduleId(null);
+    } else {
+      const newItem = { ...schedule, id: `schedule-${Date.now()}` };
+      updateRecords({ ...records, schedule: [...records.schedule, newItem] });
+    }
     setSchedule(emptySchedule);
+  };
+
+  const handleEditSchedule = (item: ScheduleRecord) => {
+    setSchedule(item);
+    setEditingScheduleId(item.id);
+  };
+
+  const handleDeleteSchedule = (id: string) => {
+    const updatedSchedule = records.schedule.filter((item) => item.id !== id);
+    updateRecords({ ...records, schedule: updatedSchedule });
+    if (editingScheduleId === id) {
+      setSchedule(emptySchedule);
+      setEditingScheduleId(null);
+    }
   };
 
   const handleOwnerLogin = (event: React.FormEvent) => {
@@ -1156,6 +633,7 @@ export default function OwnerDashboardPage() {
           </div>
         )}
 
+        {/* OVERVIEW TAB */}
         {tab === "overview" && (
           <div className="space-y-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -1228,13 +706,13 @@ export default function OwnerDashboardPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400">
-                    Active Student Profile
+                    Active Selected Student Profile
                   </span>
                   <h3 className="text-lg font-bold text-white mt-0.5">
                     {selectedApplication ? selectedApplication.studentName : "Aiden Vance"}
                   </h3>
                   <p className="text-xs text-slate-400">
-                    ID: {selectedApplication ? selectedApplication.id : "VVA-STU-8842"} • Track: {selectedApplication ? selectedApplication.targetTrack : "Cambridge AS-Level"}
+                    ID: {selectedApplication ? selectedApplication.id : "VVA-STU-8842"} • Program: {selectedApplication ? selectedApplication.targetTrack : "Cambridge AS-Level"}
                   </p>
                 </div>
 
@@ -1249,6 +727,7 @@ export default function OwnerDashboardPage() {
           </div>
         )}
 
+        {/* APPLICATIONS & ENROLLMENT TAB */}
         {tab === "applications" && (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-900 border border-slate-800 rounded-2xl p-4">
@@ -1280,12 +759,13 @@ export default function OwnerDashboardPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Left Column: Applications List */}
               <div className="lg:col-span-5 space-y-3">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
                   Enrolled Applications ({filteredApplications.length})
                 </h3>
 
-                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                <div className="space-y-3 max-h-[700px] overflow-y-auto pr-1">
                   {filteredApplications.map((item) => {
                     const isSelected = selectedApplication?.id === item.id;
                     const account = studentAccounts.find(
@@ -1332,56 +812,172 @@ export default function OwnerDashboardPage() {
                 </div>
               </div>
 
+              {/* Right Column: Complete Application Details */}
               <div className="lg:col-span-7">
                 {selectedApplication ? (
                   <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6">
+                    {/* Header */}
                     <div className="flex items-start justify-between gap-4 border-b border-slate-800 pb-5">
                       <div>
-                        <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">
-                          Application ID: {selectedApplication.id}
+                        <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider font-mono">
+                          APPLICATION ID: {selectedApplication.id}
                         </span>
-                        <h2 className="text-xl font-extrabold text-white mt-1">
+                        <h2 className="text-xl sm:text-2xl font-extrabold text-white mt-1">
                           {selectedApplication.studentName}
                         </h2>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          Applied on {selectedApplication.createdAt}
+                        <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-slate-500" /> Applied on {selectedApplication.createdAt}
                         </p>
                       </div>
 
                       <button
                         onClick={() => setDeleteConfirmApp(selectedApplication)}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800/60 text-xs font-bold transition-colors shrink-0"
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800/60 text-xs font-bold transition-colors shrink-0 shadow-lg shadow-rose-950/40"
                       >
                         <Trash2 className="w-3.5 h-3.5" /> Delete Application
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                      <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
-                        <span className="text-slate-500 block font-semibold">Student Email</span>
-                        <strong className="text-white mt-0.5 block break-all">{selectedApplication.studentEmail}</strong>
-                      </div>
-                      <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
-                        <span className="text-slate-500 block font-semibold">Parent / Guardian</span>
-                        <strong className="text-white mt-0.5 block">{selectedApplication.parentName} ({selectedApplication.parentPhone})</strong>
-                      </div>
-                      <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
-                        <span className="text-slate-500 block font-semibold">Academic Program</span>
-                        <strong className="text-white mt-0.5 block">{selectedApplication.targetTrack} • {selectedApplication.gradeLevel}</strong>
-                      </div>
-                      <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
-                        <span className="text-slate-500 block font-semibold">Location / Nationality</span>
-                        <strong className="text-white mt-0.5 block">{selectedApplication.city}, {selectedApplication.countryOfResidence} ({selectedApplication.nationality})</strong>
+                    {/* Section 1: Personal & Demographics */}
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                        <User className="w-4 h-4" /> Personal & Demographics
+                      </h4>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
+                          <span className="text-slate-500 block font-semibold flex items-center gap-1">
+                            <Mail className="w-3.5 h-3.5 text-indigo-400" /> Student Email
+                          </span>
+                          <strong className="text-white mt-1 block break-all text-xs font-mono">{selectedApplication.studentEmail}</strong>
+                        </div>
+
+                        <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
+                          <span className="text-slate-500 block font-semibold flex items-center gap-1">
+                            <Calendar className="w-3.5 h-3.5 text-indigo-400" /> Date of Birth
+                          </span>
+                          <strong className="text-white mt-1 block">{selectedApplication.dateOfBirth || "N/A"}</strong>
+                        </div>
+
+                        <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
+                          <span className="text-slate-500 block font-semibold flex items-center gap-1">
+                            <Globe className="w-3.5 h-3.5 text-indigo-400" /> Nationality
+                          </span>
+                          <strong className="text-white mt-1 block">{selectedApplication.nationality || "N/A"}</strong>
+                        </div>
+
+                        <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
+                          <span className="text-slate-500 block font-semibold flex items-center gap-1">
+                            <MapPin className="w-3.5 h-3.5 text-indigo-400" /> Location (City & Country)
+                          </span>
+                          <strong className="text-white mt-1 block">
+                            {selectedApplication.city ? `${selectedApplication.city}, ${selectedApplication.countryOfResidence}` : selectedApplication.countryOfResidence || "N/A"}
+                          </strong>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="space-y-3 pt-2">
+                    {/* Section 2: Parent / Guardian Details */}
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                        <Users className="w-4 h-4" /> Parent / Guardian Information
+                      </h4>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                        <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
+                          <span className="text-slate-500 block font-semibold">Guardian Name</span>
+                          <strong className="text-white mt-1 block">{selectedApplication.parentName || "N/A"}</strong>
+                        </div>
+
+                        <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
+                          <span className="text-slate-500 block font-semibold flex items-center gap-1">
+                            <Mail className="w-3 h-3 text-slate-500" /> Guardian Email
+                          </span>
+                          <strong className="text-white mt-1 block break-all font-mono">{selectedApplication.parentEmail || "N/A"}</strong>
+                        </div>
+
+                        <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
+                          <span className="text-slate-500 block font-semibold flex items-center gap-1">
+                            <Phone className="w-3 h-3 text-slate-500" /> Phone Number
+                          </span>
+                          <strong className="text-white mt-1 block font-mono">{selectedApplication.parentPhone || "N/A"}</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 3: Academic Program & Slot Selections */}
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                        <BookOpen className="w-4 h-4" /> Academic Track & Class Preferences
+                      </h4>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
+                          <span className="text-slate-500 block font-semibold">Target Academic Program</span>
+                          <strong className="text-emerald-400 mt-1 block font-bold">{selectedApplication.targetTrack} ({selectedApplication.gradeLevel})</strong>
+                        </div>
+
+                        <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
+                          <span className="text-slate-500 block font-semibold flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5 text-amber-400" /> Class Time Slot
+                          </span>
+                          <strong className="text-amber-300 mt-1 block font-bold">{selectedApplication.preferredCohortSlot || "Morning Cohort (09:00 - 13:00 GMT)"}</strong>
+                        </div>
+
+                        <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
+                          <span className="text-slate-500 block font-semibold">Time Zone</span>
+                          <strong className="text-white mt-1 block font-mono">{selectedApplication.timeZone || "UTC+05:00 (Pakistan Standard Time)"}</strong>
+                        </div>
+
+                        <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
+                          <span className="text-slate-500 block font-semibold">Assigned Admissions Advisor</span>
+                          <strong className="text-white mt-1 block">{selectedApplication.assignedAdvisor || "Admissions Office"}</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 4: Attached Documents */}
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                        <Paperclip className="w-4 h-4" /> Uploaded Student Documents
+                      </h4>
+
+                      <div className="flex flex-wrap gap-2">
+                        {selectedApplication.documentsAttached && selectedApplication.documentsAttached.length > 0 ? (
+                          selectedApplication.documentsAttached.map((docName, idx) => (
+                            <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-200">
+                              <FileText className="w-4 h-4 text-indigo-400" />
+                              <span className="font-semibold">{docName}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-500 italic w-full">
+                            No documents attached during registration.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Section 5: Statement of Purpose */}
+                    {selectedApplication.statementOfPurpose && (
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider">
+                          Statement of Purpose / Student Notes
+                        </h4>
+                        <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-slate-300 leading-relaxed italic">
+                          "{selectedApplication.statementOfPurpose}"
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Section 6: Status & Credentials Management */}
+                    <div className="space-y-3 pt-4 border-t border-slate-800">
                       <label className="block text-xs font-semibold text-slate-300">
                         Update Application Status
                         <select
                           value={selectedApplication.status}
                           onChange={(e) => updateStatus(e.target.value as AdmissionsApplication["status"])}
-                          className="mt-1.5 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                          className="mt-1.5 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 font-semibold"
                         >
                           <option value="Under Review">Under Review</option>
                           <option value="Verified">Verified</option>
@@ -1436,6 +1032,7 @@ export default function OwnerDashboardPage() {
           </div>
         )}
 
+        {/* ASSIGNMENTS MANAGER TAB */}
         {tab === "assignments" && (
           <div className="space-y-8">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -1635,8 +1232,10 @@ export default function OwnerDashboardPage() {
           </div>
         )}
 
+        {/* ACADEMIC RECORDS & TIMETABLE TAB */}
         {tab === "records" && (
           <div className="space-y-8">
+            {/* Section 1: Academic Results & Grades (With Edit & Delete) */}
             <section className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
@@ -1645,48 +1244,133 @@ export default function OwnerDashboardPage() {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <div className="lg:col-span-7 space-y-2">
+                <div className="lg:col-span-7 space-y-3">
                   {records.results.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950 p-3.5 text-left">
-                      <div>
-                        <strong className="block text-xs text-white">{item.course}</strong>
-                        <small className="text-slate-400">{item.code} • {item.feedback}</small>
+                    <div
+                      key={item.id}
+                      className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-4 hover:border-slate-700 transition-colors"
+                    >
+                      <div className="space-y-1">
+                        <strong className="block text-sm font-bold text-white">{item.course}</strong>
+                        <p className="text-xs text-slate-400">
+                          Code: <span className="font-mono text-indigo-400">{item.code}</span> • {item.feedback || "Grade published"}
+                        </p>
                       </div>
-                      <span className="text-xs font-bold text-emerald-400">{item.score} ({item.grade})</span>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-sm font-extrabold text-emerald-400">{item.score} ({item.grade})</span>
+                        
+                        <div className="flex items-center gap-1 border-l border-slate-800 pl-2">
+                          <button
+                            onClick={() => handleEditResult(item)}
+                            className="p-1.5 rounded-lg bg-indigo-950 hover:bg-indigo-900 text-indigo-300 border border-indigo-800/50 transition-colors"
+                            title="Edit Grade"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteResult(item.id)}
+                            className="p-1.5 rounded-lg bg-rose-950/50 hover:bg-rose-900 text-rose-300 border border-rose-800/50 transition-colors"
+                            title="Delete Grade"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   ))}
+
+                  {records.results.length === 0 && (
+                    <div className="p-6 text-center text-xs text-slate-500 bg-slate-950 rounded-2xl border border-slate-800 italic">
+                      No academic results saved yet.
+                    </div>
+                  )}
                 </div>
 
-                <form onSubmit={saveResult} className="lg:col-span-5 space-y-2 rounded-2xl border border-slate-800 bg-slate-950 p-4 text-xs">
+                <form onSubmit={saveResult} className="lg:col-span-5 space-y-3 rounded-2xl border border-slate-800 bg-slate-950 p-5 text-xs">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span className="font-bold text-white uppercase tracking-wider text-[11px]">
+                      {editingResultId ? "Edit Subject Grade" : "Add New Subject Grade"}
+                    </span>
+                    {editingResultId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setResult(emptyResult);
+                          setEditingResultId(null);
+                        }}
+                        className="text-slate-400 hover:text-white text-[10px]"
+                      >
+                        Cancel Edit
+                      </button>
+                    )}
+                  </div>
+
                   <div>
                     <label className="text-slate-400 font-semibold block mb-1">Course Name</label>
-                    <input value={result.course} onChange={(e) => setResult({ ...result, course: e.target.value })} className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white" placeholder="Computer Science" />
+                    <input
+                      required
+                      value={result.course}
+                      onChange={(e) => setResult({ ...result, course: e.target.value })}
+                      className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                      placeholder="e.g. Computer Science"
+                    />
                   </div>
+
                   <div>
                     <label className="text-slate-400 font-semibold block mb-1">Course Code</label>
-                    <input value={result.code} onChange={(e) => setResult({ ...result, code: e.target.value })} className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white" placeholder="CS101" />
+                    <input
+                      value={result.code}
+                      onChange={(e) => setResult({ ...result, code: e.target.value })}
+                      className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-white focus:outline-none focus:border-indigo-500 font-mono"
+                      placeholder="e.g. CS101"
+                    />
                   </div>
+
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="text-slate-400 font-semibold block mb-1">Score</label>
-                      <input value={result.score} onChange={(e) => setResult({ ...result, score: e.target.value })} className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white" placeholder="92%" />
+                      <label className="text-slate-400 font-semibold block mb-1">Score (%)</label>
+                      <input
+                        required
+                        value={result.score}
+                        onChange={(e) => setResult({ ...result, score: e.target.value })}
+                        className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                        placeholder="e.g. 92%"
+                      />
                     </div>
                     <div>
-                      <label className="text-slate-400 font-semibold block mb-1">Grade</label>
-                      <input value={result.grade} onChange={(e) => setResult({ ...result, grade: e.target.value })} className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white" placeholder="A*" />
+                      <label className="text-slate-400 font-semibold block mb-1">Grade Letter</label>
+                      <input
+                        required
+                        value={result.grade}
+                        onChange={(e) => setResult({ ...result, grade: e.target.value })}
+                        className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                        placeholder="e.g. A*"
+                      />
                     </div>
                   </div>
+
                   <div>
-                    <label className="text-slate-400 font-semibold block mb-1">Feedback</label>
-                    <input value={result.feedback} onChange={(e) => setResult({ ...result, feedback: e.target.value })} className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white" placeholder="Great work!" />
+                    <label className="text-slate-400 font-semibold block mb-1">Teacher Feedback Comment</label>
+                    <input
+                      value={result.feedback}
+                      onChange={(e) => setResult({ ...result, feedback: e.target.value })}
+                      className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                      placeholder="e.g. Exceptional problem solving skills"
+                    />
                   </div>
-                  <button type="submit" className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 py-2.5 font-bold text-white hover:bg-indigo-500 mt-2">
-                    <Save className="h-4 w-4" /> Save Academic Result
+
+                  <button
+                    type="submit"
+                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 font-bold text-white hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-600/30 mt-2"
+                  >
+                    <Save className="h-4 w-4" /> {editingResultId ? "Update Academic Result" : "Save Academic Result"}
                   </button>
                 </form>
               </div>
             </section>
 
+            {/* Section 2: Attendance Log (With Edit & Delete) */}
             <section className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
@@ -1695,39 +1379,116 @@ export default function OwnerDashboardPage() {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <div className="lg:col-span-7 space-y-2">
+                <div className="lg:col-span-7 space-y-3">
                   {records.attendance.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950 p-3.5 text-left">
+                    <div
+                      key={item.id}
+                      className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-4 hover:border-slate-700 transition-colors"
+                    >
                       <div>
-                        <strong className="block text-xs text-white">{item.course}</strong>
-                        <small className="text-slate-400">{item.date}</small>
+                        <strong className="block text-xs font-bold text-white">{item.course}</strong>
+                        <span className="text-[11px] text-slate-400">{item.date}</span>
                       </div>
-                      <span className={`text-xs font-bold ${item.status === "Present" ? "text-emerald-400" : item.status === "Late" ? "text-amber-400" : "text-rose-400"}`}>
-                        {item.status}
-                      </span>
+
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`text-xs font-bold px-3 py-1 rounded-full ${
+                            item.status === "Present"
+                              ? "bg-emerald-950 text-emerald-300 border border-emerald-800/50"
+                              : item.status === "Late"
+                              ? "bg-amber-950 text-amber-300 border border-amber-800/50"
+                              : "bg-rose-950 text-rose-300 border border-rose-800/50"
+                          }`}
+                        >
+                          {item.status}
+                        </span>
+
+                        <div className="flex items-center gap-1 border-l border-slate-800 pl-2">
+                          <button
+                            onClick={() => handleEditAttendance(item)}
+                            className="p-1.5 rounded-lg bg-indigo-950 hover:bg-indigo-900 text-indigo-300 border border-indigo-800/50 transition-colors"
+                            title="Edit Attendance"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteAttendance(item.id)}
+                            className="p-1.5 rounded-lg bg-rose-950/50 hover:bg-rose-900 text-rose-300 border border-rose-800/50 transition-colors"
+                            title="Delete Attendance"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   ))}
+
+                  {records.attendance.length === 0 && (
+                    <div className="p-6 text-center text-xs text-slate-500 bg-slate-950 rounded-2xl border border-slate-800 italic">
+                      No attendance entries logged yet.
+                    </div>
+                  )}
                 </div>
 
-                <form onSubmit={saveAttendance} className="lg:col-span-5 space-y-2 rounded-2xl border border-slate-800 bg-slate-950 p-4 text-xs">
+                <form onSubmit={saveAttendance} className="lg:col-span-5 space-y-3 rounded-2xl border border-slate-800 bg-slate-950 p-5 text-xs">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span className="font-bold text-white uppercase tracking-wider text-[11px]">
+                      {editingAttendanceId ? "Edit Attendance Entry" : "Log Attendance"}
+                    </span>
+                    {editingAttendanceId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAttendance(emptyAttendance);
+                          setEditingAttendanceId(null);
+                        }}
+                        className="text-slate-400 hover:text-white text-[10px]"
+                      >
+                        Cancel Edit
+                      </button>
+                    )}
+                  </div>
+
                   <div>
                     <label className="text-slate-400 font-semibold block mb-1">Course Name</label>
-                    <input value={attendance.course} onChange={(e) => setAttendance({ ...attendance, course: e.target.value })} className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white" />
+                    <input
+                      required
+                      value={attendance.course}
+                      onChange={(e) => setAttendance({ ...attendance, course: e.target.value })}
+                      className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                      placeholder="e.g. Pure Mathematics"
+                    />
                   </div>
+
                   <div>
                     <label className="text-slate-400 font-semibold block mb-1">Date</label>
-                    <input type="date" value={attendance.date} onChange={(e) => setAttendance({ ...attendance, date: e.target.value })} className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white" />
+                    <input
+                      required
+                      type="date"
+                      value={attendance.date}
+                      onChange={(e) => setAttendance({ ...attendance, date: e.target.value })}
+                      className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                    />
                   </div>
+
                   <div>
-                    <label className="text-slate-400 font-semibold block mb-1">Status</label>
-                    <select value={attendance.status} onChange={(e) => setAttendance({ ...attendance, status: e.target.value as AttendanceRecord["status"] })} className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white">
+                    <label className="text-slate-400 font-semibold block mb-1">Attendance Status</label>
+                    <select
+                      value={attendance.status}
+                      onChange={(e) => setAttendance({ ...attendance, status: e.target.value as AttendanceRecord["status"] })}
+                      className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                    >
                       <option value="Present">Present</option>
                       <option value="Late">Late</option>
                       <option value="Absent">Absent</option>
                     </select>
                   </div>
-                  <button type="submit" className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 py-2.5 font-bold text-white hover:bg-indigo-500 mt-2">
-                    <Save className="h-4 w-4" /> Save Attendance Log
+
+                  <button
+                    type="submit"
+                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 font-bold text-white hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-600/30 mt-2"
+                  >
+                    <Save className="h-4 w-4" /> {editingAttendanceId ? "Update Attendance Log" : "Save Attendance Log"}
                   </button>
                 </form>
               </div>
@@ -1736,7 +1497,7 @@ export default function OwnerDashboardPage() {
         )}
       </main>
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Application Modal */}
       {deleteConfirmApp && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-6 shadow-2xl">
@@ -1769,7 +1530,7 @@ export default function OwnerDashboardPage() {
         </div>
       )}
 
-      {/* Grading Review Modal */}
+      {/* Homework Grading Modal */}
       {gradingAssignment && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full space-y-6 shadow-2xl">
