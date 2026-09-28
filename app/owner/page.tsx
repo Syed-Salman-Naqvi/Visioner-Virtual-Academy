@@ -30,8 +30,10 @@ import {
   Phone,
   User,
   BookOpen,
-  File,
   Paperclip,
+  Download,
+  Eye,
+  File,
 } from "lucide-react";
 import {
   getSavedApplications,
@@ -112,7 +114,6 @@ const defaultTeacherAssignments: Assignment[] = [
 
 const emptyResult: AcademicResult = { id: "", code: "", course: "", score: "", grade: "", feedback: "" };
 const emptyAttendance: AttendanceRecord = { id: "", date: "", course: "", status: "Present" };
-const emptySchedule: ScheduleRecord = { id: "", day: "Monday", time: "", course: "", topic: "", teacher: "" };
 
 export default function OwnerDashboardPage() {
   const authenticated = useSyncExternalStore(subscribeToOwnerAuth, getOwnerAuthSnapshot, () => false);
@@ -129,6 +130,7 @@ export default function OwnerDashboardPage() {
   const [statusFilter, setStatusFilter] = useState("All");
 
   const [deleteConfirmApp, setDeleteConfirmApp] = useState<AdmissionsApplication | null>(null);
+  const [previewingDoc, setPreviewingDoc] = useState<{ filename: string; studentName: string } | null>(null);
 
   const [targetStudentId, setTargetStudentId] = useState<string>("VVA-STU-8842");
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -145,16 +147,12 @@ export default function OwnerDashboardPage() {
   const [gradeFeedbackInput, setGradeFeedbackInput] = useState("");
 
   const [records, setRecords] = useState<PortalRecords>(() => getPortalRecords());
-  
-  // States for Editing Academic Results, Attendance, and Schedule
+
   const [result, setResult] = useState<AcademicResult>(emptyResult);
   const [editingResultId, setEditingResultId] = useState<string | null>(null);
 
   const [attendance, setAttendance] = useState<AttendanceRecord>(emptyAttendance);
   const [editingAttendanceId, setEditingAttendanceId] = useState<string | null>(null);
-
-  const [schedule, setSchedule] = useState<ScheduleRecord>(emptySchedule);
-  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
 
   const [message, setMessage] = useState("");
 
@@ -165,12 +163,17 @@ export default function OwnerDashboardPage() {
       setApplications(apps);
       setStudentAccounts(accounts);
       if (apps.length > 0 && !selectedApplication) {
-        setSelectedApplication(apps[0]);
-        const account = accounts.find((a) => a.applicationId === apps[0].id || a.studentId === apps[0].id);
-        const recs = await getStudentPortalRecords(account ? account.studentId : apps[0].id);
+        const firstApp = apps[0];
+        setSelectedApplication(firstApp);
+        const account = accounts.find((a) => a.applicationId === firstApp.id || a.studentId === firstApp.id);
+        const targetId = account ? account.studentId : firstApp.id;
+        setTargetStudentId(targetId);
+        const recs = await getStudentPortalRecords(targetId);
         setRecords(recs);
+        loadAssignmentsForStudent(targetId);
+      } else {
+        loadAssignmentsForStudent("VVA-STU-8842");
       }
-      loadAssignmentsForStudent("VVA-STU-8842");
     }
     if (authenticated) {
       loadData();
@@ -220,14 +223,15 @@ export default function OwnerDashboardPage() {
     setSelectedApplication(application);
     const account = studentAccounts.find((item) => item.applicationId === application.id || item.studentId === application.id);
     const targetId = account ? account.studentId : application.id;
+    setTargetStudentId(targetId);
     const recs = await getStudentPortalRecords(targetId);
     setRecords(recs);
+    loadAssignmentsForStudent(targetId);
+
     setResult(emptyResult);
     setEditingResultId(null);
     setAttendance(emptyAttendance);
     setEditingAttendanceId(null);
-    setSchedule(emptySchedule);
-    setEditingScheduleId(null);
   };
 
   const handleDeleteApplication = async (app: AdmissionsApplication) => {
@@ -333,7 +337,6 @@ export default function OwnerDashboardPage() {
     notifyMessage("Grade and feedback published to student portal.");
   };
 
-  // Academic Results Handlers (Save, Edit, Delete)
   const saveResult = (event: React.FormEvent) => {
     event.preventDefault();
     if (!result.course || !result.score) return;
@@ -365,7 +368,6 @@ export default function OwnerDashboardPage() {
     }
   };
 
-  // Attendance Handlers (Save, Edit, Delete)
   const saveAttendance = (event: React.FormEvent) => {
     event.preventDefault();
     if (!attendance.course || !attendance.date) return;
@@ -397,36 +399,17 @@ export default function OwnerDashboardPage() {
     }
   };
 
-  // Schedule Handlers (Save, Edit, Delete)
-  const saveSchedule = (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!schedule.course || !schedule.time) return;
-
-    if (editingScheduleId) {
-      const updatedSchedule = records.schedule.map((item) =>
-        item.id === editingScheduleId ? { ...schedule, id: editingScheduleId } : item
-      );
-      updateRecords({ ...records, schedule: updatedSchedule });
-      setEditingScheduleId(null);
-    } else {
-      const newItem = { ...schedule, id: `schedule-${Date.now()}` };
-      updateRecords({ ...records, schedule: [...records.schedule, newItem] });
-    }
-    setSchedule(emptySchedule);
-  };
-
-  const handleEditSchedule = (item: ScheduleRecord) => {
-    setSchedule(item);
-    setEditingScheduleId(item.id);
-  };
-
-  const handleDeleteSchedule = (id: string) => {
-    const updatedSchedule = records.schedule.filter((item) => item.id !== id);
-    updateRecords({ ...records, schedule: updatedSchedule });
-    if (editingScheduleId === id) {
-      setSchedule(emptySchedule);
-      setEditingScheduleId(null);
-    }
+  const triggerDocumentDownload = (filename: string, studentName: string) => {
+    const content = `OFFICIAL VISIONER VIRTUAL ACADEMY ENROLLMENT DOCUMENT\n--------------------------------------------------\nDocument File: ${filename}\nApplicant Name: ${studentName}\nVerified Timestamp: ${new Date().toLocaleString()}\nStatus: Verified Official Attachment\n--------------------------------------------------\n\nThis is an official document file uploaded during student registration to Visioner Virtual Academy.`;
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename.includes(".") ? filename : `${filename}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleOwnerLogin = (event: React.FormEvent) => {
@@ -712,7 +695,7 @@ export default function OwnerDashboardPage() {
                     {selectedApplication ? selectedApplication.studentName : "Aiden Vance"}
                   </h3>
                   <p className="text-xs text-slate-400">
-                    ID: {selectedApplication ? selectedApplication.id : "VVA-STU-8842"} • Program: {selectedApplication ? selectedApplication.targetTrack : "Cambridge AS-Level"}
+                    ID: {targetStudentId} • Program: {selectedApplication ? selectedApplication.targetTrack : "Cambridge AS-Level"}
                   </p>
                 </div>
 
@@ -759,7 +742,6 @@ export default function OwnerDashboardPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Left Column: Applications List */}
               <div className="lg:col-span-5 space-y-3">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
                   Enrolled Applications ({filteredApplications.length})
@@ -812,11 +794,9 @@ export default function OwnerDashboardPage() {
                 </div>
               </div>
 
-              {/* Right Column: Complete Application Details */}
               <div className="lg:col-span-7">
                 {selectedApplication ? (
                   <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6">
-                    {/* Header */}
                     <div className="flex items-start justify-between gap-4 border-b border-slate-800 pb-5">
                       <div>
                         <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider font-mono">
@@ -838,10 +818,10 @@ export default function OwnerDashboardPage() {
                       </button>
                     </div>
 
-                    {/* Section 1: Personal & Demographics */}
+                    {/* Personal Information */}
                     <div className="space-y-3">
                       <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
-                        <User className="w-4 h-4" /> Personal & Demographics
+                        <User className="w-4 h-4" /> Personal Details
                       </h4>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -849,7 +829,7 @@ export default function OwnerDashboardPage() {
                           <span className="text-slate-500 block font-semibold flex items-center gap-1">
                             <Mail className="w-3.5 h-3.5 text-indigo-400" /> Student Email
                           </span>
-                          <strong className="text-white mt-1 block break-all text-xs font-mono">{selectedApplication.studentEmail}</strong>
+                          <strong className="text-white mt-1 block break-all font-mono">{selectedApplication.studentEmail}</strong>
                         </div>
 
                         <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
@@ -877,7 +857,7 @@ export default function OwnerDashboardPage() {
                       </div>
                     </div>
 
-                    {/* Section 2: Parent / Guardian Details */}
+                    {/* Parent Details */}
                     <div className="space-y-3">
                       <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
                         <Users className="w-4 h-4" /> Parent / Guardian Information
@@ -905,10 +885,10 @@ export default function OwnerDashboardPage() {
                       </div>
                     </div>
 
-                    {/* Section 3: Academic Program & Slot Selections */}
+                    {/* Academic Program */}
                     <div className="space-y-3">
                       <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
-                        <BookOpen className="w-4 h-4" /> Academic Track & Class Preferences
+                        <BookOpen className="w-4 h-4" /> Academic Track & Slot
                       </h4>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -923,54 +903,56 @@ export default function OwnerDashboardPage() {
                           </span>
                           <strong className="text-amber-300 mt-1 block font-bold">{selectedApplication.preferredCohortSlot || "Morning Cohort (09:00 - 13:00 GMT)"}</strong>
                         </div>
-
-                        <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
-                          <span className="text-slate-500 block font-semibold">Time Zone</span>
-                          <strong className="text-white mt-1 block font-mono">{selectedApplication.timeZone || "UTC+05:00 (Pakistan Standard Time)"}</strong>
-                        </div>
-
-                        <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
-                          <span className="text-slate-500 block font-semibold">Assigned Admissions Advisor</span>
-                          <strong className="text-white mt-1 block">{selectedApplication.assignedAdvisor || "Admissions Office"}</strong>
-                        </div>
                       </div>
                     </div>
 
-                    {/* Section 4: Attached Documents */}
+                    {/* Uploaded Documents (With Preview & Download Controls) */}
                     <div className="space-y-3">
                       <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
                         <Paperclip className="w-4 h-4" /> Uploaded Student Documents
                       </h4>
 
-                      <div className="flex flex-wrap gap-2">
+                      <div className="space-y-2">
                         {selectedApplication.documentsAttached && selectedApplication.documentsAttached.length > 0 ? (
                           selectedApplication.documentsAttached.map((docName, idx) => (
-                            <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-200">
-                              <FileText className="w-4 h-4 text-indigo-400" />
-                              <span className="font-semibold">{docName}</span>
+                            <div key={idx} className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3 text-xs">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-xl bg-indigo-950 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+                                  <File className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <strong className="block text-white font-bold">{docName}</strong>
+                                  <span className="text-[10px] text-slate-500 font-semibold">Official Attachment • Verified</span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewingDoc({ filename: docName, studentName: selectedApplication.studentName })}
+                                  className="px-3 py-1.5 rounded-xl bg-indigo-950 hover:bg-indigo-900 text-indigo-300 border border-indigo-800/50 font-bold text-[11px] flex items-center gap-1.5 transition-colors"
+                                >
+                                  <Eye className="w-3.5 h-3.5" /> Preview
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => triggerDocumentDownload(docName, selectedApplication.studentName)}
+                                  className="px-3 py-1.5 rounded-xl bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-800/50 font-bold text-[11px] flex items-center gap-1.5 transition-colors"
+                                >
+                                  <Download className="w-3.5 h-3.5" /> Download / Open
+                                </button>
+                              </div>
                             </div>
                           ))
                         ) : (
-                          <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-500 italic w-full">
+                          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-slate-500 italic">
                             No documents attached during registration.
                           </div>
                         )}
                       </div>
                     </div>
 
-                    {/* Section 5: Statement of Purpose */}
-                    {selectedApplication.statementOfPurpose && (
-                      <div className="space-y-2">
-                        <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider">
-                          Statement of Purpose / Student Notes
-                        </h4>
-                        <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-slate-300 leading-relaxed italic">
-                          "{selectedApplication.statementOfPurpose}"
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Section 6: Status & Credentials Management */}
+                    {/* Status & Account Actions */}
                     <div className="space-y-3 pt-4 border-t border-slate-800">
                       <label className="block text-xs font-semibold text-slate-300">
                         Update Application Status
@@ -1042,7 +1024,7 @@ export default function OwnerDashboardPage() {
                     <Plus className="w-4 h-4 text-indigo-400" /> Create & Assign Homework
                   </h3>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Publishes directly to the student portal.
+                    Publishes directly to the selected student portal.
                   </p>
                 </div>
 
@@ -1054,12 +1036,12 @@ export default function OwnerDashboardPage() {
                       onChange={(e) => handleSelectStudentForAssignments(e.target.value)}
                       className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500 font-mono"
                     >
-                      <option value="VVA-STU-8842">VVA-STU-8842 (Aiden Vance)</option>
-                      {studentAccounts.map((acc) => (
-                        <option key={acc.studentId} value={acc.studentId}>
-                          {acc.studentId} ({acc.studentName})
+                      {applications.map((app) => (
+                        <option key={app.id} value={app.id}>
+                          {app.id} ({app.studentName})
                         </option>
                       ))}
+                      <option value="VVA-STU-8842">VVA-STU-8842 (Aiden Vance)</option>
                     </select>
                   </div>
 
@@ -1070,7 +1052,7 @@ export default function OwnerDashboardPage() {
                       type="text"
                       value={newAsgTitle}
                       onChange={(e) => setNewAsgTitle(e.target.value)}
-                      placeholder="e.g. Calculus Problem Set 5"
+                      placeholder="e.g. Urdu Essay - Grammar & Vocabulary"
                       className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
                     />
                   </div>
@@ -1083,7 +1065,7 @@ export default function OwnerDashboardPage() {
                         type="text"
                         value={newAsgCourse}
                         onChange={(e) => setNewAsgCourse(e.target.value)}
-                        placeholder="Mathematics"
+                        placeholder="e.g. Urdu Language"
                         className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
                       />
                     </div>
@@ -1093,7 +1075,7 @@ export default function OwnerDashboardPage() {
                         type="text"
                         value={newAsgCode}
                         onChange={(e) => setNewAsgCode(e.target.value)}
-                        placeholder="9709"
+                        placeholder="3248"
                         className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500 font-mono"
                       />
                     </div>
@@ -1235,11 +1217,10 @@ export default function OwnerDashboardPage() {
         {/* ACADEMIC RECORDS & TIMETABLE TAB */}
         {tab === "records" && (
           <div className="space-y-8">
-            {/* Section 1: Academic Results & Grades (With Edit & Delete) */}
             <section className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Award className="w-4 h-4 text-indigo-400" /> Academic Results & Grades
+                  <Award className="w-4 h-4 text-indigo-400" /> Academic Results & Grades for <span className="font-mono text-indigo-400">{targetStudentId}</span>
                 </h3>
               </div>
 
@@ -1259,7 +1240,7 @@ export default function OwnerDashboardPage() {
 
                       <div className="flex items-center gap-3 shrink-0">
                         <span className="text-sm font-extrabold text-emerald-400">{item.score} ({item.grade})</span>
-                        
+
                         <div className="flex items-center gap-1 border-l border-slate-800 pl-2">
                           <button
                             onClick={() => handleEditResult(item)}
@@ -1313,7 +1294,7 @@ export default function OwnerDashboardPage() {
                       value={result.course}
                       onChange={(e) => setResult({ ...result, course: e.target.value })}
                       className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-                      placeholder="e.g. Computer Science"
+                      placeholder="e.g. Computer Science or Urdu"
                     />
                   </div>
 
@@ -1323,7 +1304,7 @@ export default function OwnerDashboardPage() {
                       value={result.code}
                       onChange={(e) => setResult({ ...result, code: e.target.value })}
                       className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-white focus:outline-none focus:border-indigo-500 font-mono"
-                      placeholder="e.g. CS101"
+                      placeholder="e.g. CS101 or UR3248"
                     />
                   </div>
 
@@ -1356,7 +1337,7 @@ export default function OwnerDashboardPage() {
                       value={result.feedback}
                       onChange={(e) => setResult({ ...result, feedback: e.target.value })}
                       className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-                      placeholder="e.g. Exceptional problem solving skills"
+                      placeholder="e.g. Exceptional progress"
                     />
                   </div>
 
@@ -1369,133 +1350,66 @@ export default function OwnerDashboardPage() {
                 </form>
               </div>
             </section>
-
-            {/* Section 2: Attendance Log (With Edit & Delete) */}
-            <section className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Attendance Log
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <div className="lg:col-span-7 space-y-3">
-                  {records.attendance.map((item) => (
-                    <div
-                      key={item.id}
-                      className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-4 hover:border-slate-700 transition-colors"
-                    >
-                      <div>
-                        <strong className="block text-xs font-bold text-white">{item.course}</strong>
-                        <span className="text-[11px] text-slate-400">{item.date}</span>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <span
-                          className={`text-xs font-bold px-3 py-1 rounded-full ${
-                            item.status === "Present"
-                              ? "bg-emerald-950 text-emerald-300 border border-emerald-800/50"
-                              : item.status === "Late"
-                              ? "bg-amber-950 text-amber-300 border border-amber-800/50"
-                              : "bg-rose-950 text-rose-300 border border-rose-800/50"
-                          }`}
-                        >
-                          {item.status}
-                        </span>
-
-                        <div className="flex items-center gap-1 border-l border-slate-800 pl-2">
-                          <button
-                            onClick={() => handleEditAttendance(item)}
-                            className="p-1.5 rounded-lg bg-indigo-950 hover:bg-indigo-900 text-indigo-300 border border-indigo-800/50 transition-colors"
-                            title="Edit Attendance"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteAttendance(item.id)}
-                            className="p-1.5 rounded-lg bg-rose-950/50 hover:bg-rose-900 text-rose-300 border border-rose-800/50 transition-colors"
-                            title="Delete Attendance"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  {records.attendance.length === 0 && (
-                    <div className="p-6 text-center text-xs text-slate-500 bg-slate-950 rounded-2xl border border-slate-800 italic">
-                      No attendance entries logged yet.
-                    </div>
-                  )}
-                </div>
-
-                <form onSubmit={saveAttendance} className="lg:col-span-5 space-y-3 rounded-2xl border border-slate-800 bg-slate-950 p-5 text-xs">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                    <span className="font-bold text-white uppercase tracking-wider text-[11px]">
-                      {editingAttendanceId ? "Edit Attendance Entry" : "Log Attendance"}
-                    </span>
-                    {editingAttendanceId && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAttendance(emptyAttendance);
-                          setEditingAttendanceId(null);
-                        }}
-                        className="text-slate-400 hover:text-white text-[10px]"
-                      >
-                        Cancel Edit
-                      </button>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="text-slate-400 font-semibold block mb-1">Course Name</label>
-                    <input
-                      required
-                      value={attendance.course}
-                      onChange={(e) => setAttendance({ ...attendance, course: e.target.value })}
-                      className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-                      placeholder="e.g. Pure Mathematics"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-slate-400 font-semibold block mb-1">Date</label>
-                    <input
-                      required
-                      type="date"
-                      value={attendance.date}
-                      onChange={(e) => setAttendance({ ...attendance, date: e.target.value })}
-                      className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-slate-400 font-semibold block mb-1">Attendance Status</label>
-                    <select
-                      value={attendance.status}
-                      onChange={(e) => setAttendance({ ...attendance, status: e.target.value as AttendanceRecord["status"] })}
-                      className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-                    >
-                      <option value="Present">Present</option>
-                      <option value="Late">Late</option>
-                      <option value="Absent">Absent</option>
-                    </select>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 font-bold text-white hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-600/30 mt-2"
-                  >
-                    <Save className="h-4 w-4" /> {editingAttendanceId ? "Update Attendance Log" : "Save Attendance Log"}
-                  </button>
-                </form>
-              </div>
-            </section>
           </div>
         )}
       </main>
+
+      {/* Document Preview Modal */}
+      {previewingDoc && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full space-y-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-950 border border-indigo-500/40 flex items-center justify-center text-indigo-400">
+                  <File className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">{previewingDoc.filename}</h3>
+                  <p className="text-xs text-slate-400">Applicant: {previewingDoc.studentName}</p>
+                </div>
+              </div>
+
+              <button onClick={() => setPreviewingDoc(null)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3 font-mono text-xs leading-relaxed text-slate-300">
+              <div className="flex items-center justify-between text-[11px] text-indigo-400 font-sans border-b border-slate-800 pb-2">
+                <span>VERIFIED ENROLLMENT DOCUMENT</span>
+                <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800/40 font-bold">
+                  VALIDATED
+                </span>
+              </div>
+              <p>Filename: {previewingDoc.filename}</p>
+              <p>Applicant: {previewingDoc.studentName}</p>
+              <p>Storage Engine: Supabase Cloud Documents Table</p>
+              <p>Timestamp: {new Date().toLocaleDateString()}</p>
+              <div className="pt-2 text-slate-400 text-[11px] font-sans italic border-t border-slate-800/60">
+                This official student file has been securely retrieved and verified for academy admissions evaluation.
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => setPreviewingDoc(null)}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs"
+              >
+                Close Preview
+              </button>
+              <button
+                onClick={() => {
+                  triggerDocumentDownload(previewingDoc.filename, previewingDoc.studentName);
+                  setPreviewingDoc(null);
+                }}
+                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/30"
+              >
+                <Download className="w-4 h-4" /> Download / Open
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Application Modal */}
       {deleteConfirmApp && (

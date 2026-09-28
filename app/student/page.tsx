@@ -2,37 +2,29 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   GraduationCap,
-  BookOpen,
-  FileText,
-  CheckCircle2,
-  CalendarDays,
-  Clock,
   LogOut,
   BarChart3,
+  FileText,
   Award,
-  Upload,
-  Check,
-  Sparkles,
+  CalendarDays,
+  CheckCircle2,
+  Clock,
   Send,
-  MessageSquare,
+  Sparkles,
   ChevronRight,
+  BookOpen,
+  Paperclip,
+  Check,
 } from "lucide-react";
-import {
-  PortalRecords,
-  getStudentPortalRecords,
-} from "@/lib/portalData";
-import {
-  getStudentAssignments,
-  saveStudentAssignments,
-} from "@/lib/storage";
+import { getStudentPortalRecords, PortalRecords, AcademicResult } from "@/lib/portalData";
+import { getStudentAssignments, saveStudentAssignments } from "@/lib/storage";
 import { Assignment, StudentAccount } from "@/lib/types";
 
-type Tab = "overview" | "grades" | "assignments" | "timetable" | "attendance";
+type Tab = "overview" | "assignments" | "grades" | "timetable" | "attendance";
 
-const defaultAssignments: Assignment[] = [
+const defaultMockAssignments: Assignment[] = [
   {
     id: "asg-1",
     title: "Pure Mathematics II - Calculus Problem Set 4",
@@ -70,219 +62,166 @@ const defaultAssignments: Assignment[] = [
 ];
 
 export default function StudentPortalPage() {
-  const router = useRouter();
   const [tab, setTab] = useState<Tab>("overview");
   const [student, setStudent] = useState<StudentAccount | null>(null);
-  const [studentId, setStudentId] = useState<string>("VVA-STU-8842");
-  const [records, setRecords] = useState<PortalRecords>({
-    results: [],
-    attendance: [],
-    schedule: [],
-  });
+  const [records, setRecords] = useState<PortalRecords | null>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
-  const [submittedTexts, setSubmittedTexts] = useState<Record<string, string>>({});
-  const [submissionInput, setSubmissionInput] = useState("");
-  const [fileName, setFileName] = useState("");
-  const [submitMessage, setSubmitMessage] = useState("");
+
+  const [selectedAsg, setSelectedAsg] = useState<Assignment | null>(null);
+  const [submissionText, setSubmissionText] = useState("");
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const isAuth = window.sessionStorage.getItem("vva_student_authenticated");
-      const rawAccount = window.sessionStorage.getItem("vva_student_account");
-      const activeId = window.sessionStorage.getItem("vva_active_student_id");
-
-      if (!isAuth && !rawAccount) {
-        router.push("/login");
-        return;
-      }
-
-      if (rawAccount) {
+    async function initStudentData() {
+      let activeStudent: StudentAccount | null = null;
+      if (typeof window !== "undefined") {
         try {
-          const acc: StudentAccount = JSON.parse(rawAccount);
-          setStudent(acc);
-          const currentId = acc.studentId || activeId || "VVA-STU-8842";
-          setStudentId(currentId);
-          loadPortalRecords(currentId);
-          loadAssignments(currentId);
-        } catch {
-          loadPortalRecords("VVA-STU-8842");
-          loadAssignments("VVA-STU-8842");
+          const session = sessionStorage.getItem("vva_student_session");
+          if (session) activeStudent = JSON.parse(session);
+        } catch (e) {
+          console.error("Session parse error:", e);
         }
-      } else if (activeId) {
-        setStudentId(activeId);
-        loadPortalRecords(activeId);
-        loadAssignments(activeId);
-      } else {
-        loadPortalRecords("VVA-STU-8842");
-        loadAssignments("VVA-STU-8842");
       }
-    }
-  }, [router]);
 
-  const loadPortalRecords = async (id: string) => {
-    const liveData = await getStudentPortalRecords(id);
-    setRecords(liveData);
-  };
-
-  const loadAssignments = async (id: string) => {
-    const list = await getStudentAssignments(id, defaultAssignments);
-    setAssignments(list);
-    if (list.length > 0) {
-      setSelectedAssignment(list[0]);
-    }
-  };
-
-  const handleSignOut = () => {
-    if (typeof window !== "undefined") {
-      window.sessionStorage.removeItem("vva_student_authenticated");
-      window.sessionStorage.removeItem("vva_student_account");
-      window.sessionStorage.removeItem("vva_active_student_id");
-      window.dispatchEvent(new Event("vva_student_auth_changed"));
-    }
-    router.push("/login");
-  };
-
-  const handleSubmitAssignment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedAssignment) return;
-
-    const textSubmitted = submissionInput || "File uploaded: " + (fileName || "document.pdf");
-
-    setSubmittedTexts((prev) => ({
-      ...prev,
-      [selectedAssignment.id]: textSubmitted,
-    }));
-
-    const updated: Assignment[] = assignments.map((asg) => {
-      if (asg.id === selectedAssignment.id) {
-        return {
-          ...asg,
-          status: "submitted" as const,
+      if (!activeStudent) {
+        activeStudent = {
+          studentId: "VVA-STU-8842",
+          studentName: "Aiden Vance",
+          studentEmail: "aiden.vance@example.com",
+          password: "",
+          applicationId: "VVA-STU-8842",
         };
       }
-      return asg;
+
+      setStudent(activeStudent);
+
+      const targetId = activeStudent.studentId || activeStudent.applicationId;
+      const recs = await getStudentPortalRecords(targetId);
+      setRecords(recs);
+
+      const asgs = await getStudentAssignments(targetId, defaultMockAssignments);
+      setAssignments(asgs);
+      if (asgs.length > 0) setSelectedAsg(asgs[0]);
+    }
+
+    initStudentData();
+
+    const handleStorageChange = () => initStudentData();
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
+
+  const handleTurnInAssignment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAsg || !student) return;
+
+    const updated = assignments.map((a) => {
+      if (a.id === selectedAsg.id) {
+        return {
+          ...a,
+          status: "submitted" as const,
+          submittedAt: new Date().toISOString(),
+          submissionNotes: submissionText,
+          attachedFileName: attachedFile ? attachedFile.name : undefined,
+        };
+      }
+      return a;
     });
 
     setAssignments(updated);
-    setSelectedAssignment({
-      ...selectedAssignment,
-      status: "submitted",
-    });
+    const targetId = student.studentId || student.applicationId;
+    await saveStudentAssignments(targetId, updated);
 
-    await saveStudentAssignments(studentId, updated);
-    setSubmitMessage("Assignment submitted successfully to your teacher!");
-    setSubmissionInput("");
-    setFileName("");
-    setTimeout(() => setSubmitMessage(""), 3500);
+    setSubmitSuccess(true);
+    setSubmissionText("");
+    setAttachedFile(null);
+    setTimeout(() => setSubmitSuccess(false), 4000);
   };
 
-  const totalResults = records.results.length;
-  const avgScore = totalResults
-    ? Math.round(
-        records.results.reduce((acc, r) => {
-          const num = parseInt(r.score.replace(/[^0-9]/g, "")) || 85;
-          return acc + num;
-        }, 0) / totalResults
-      )
-    : 88;
+  const calculateAveragePerformance = (resultsList: AcademicResult[]) => {
+    if (!resultsList || resultsList.length === 0) return "0%";
+    let total = 0;
+    let count = 0;
+    resultsList.forEach((r) => {
+      const num = parseInt(r.score.replace(/[^0-9]/g, ""), 10);
+      if (!isNaN(num)) {
+        total += num;
+        count++;
+      }
+    });
+    if (count === 0) return "0%";
+    return `${Math.round(total / count)}%`;
+  };
 
-  const totalAttendance = records.attendance.length;
-  const presentCount = records.attendance.filter(
-    (a) => a.status === "Present" || a.status === "Late"
-  ).length;
-  const attendancePercentage = totalAttendance
-    ? Math.round((presentCount / totalAttendance) * 100)
-    : 95;
+  const calculateAttendancePercentage = () => {
+    if (!records || !records.attendance || records.attendance.length === 0) return "100%";
+    const presentCount = records.attendance.filter((a) => a.status === "Present").length;
+    return `${Math.round((presentCount / records.attendance.length) * 100)}%`;
+  };
 
-  const pendingAssignments = assignments.filter((a) => a.status === "pending").length;
+  const pendingCount = assignments.filter((a) => a.status === "pending").length;
+  const displayResults = records?.results || [];
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
       <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-50 px-4 sm:px-8 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/30 group-hover:scale-105 transition-transform">
-              <GraduationCap className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <strong className="block text-sm text-white font-bold tracking-wide">
-                Visioner Virtual Academy
-              </strong>
-              <span className="text-[10px] uppercase font-semibold text-indigo-400 tracking-wider">
+          <Link href="/" className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 shadow-lg shadow-indigo-600/30">
+              <GraduationCap className="h-5 w-5 text-white" />
+            </span>
+            <span>
+              <strong className="block text-sm text-white font-bold">Visioner Virtual Academy</strong>
+              <small className="text-[10px] uppercase font-semibold text-indigo-400 tracking-wider">
                 Student Portal
-              </span>
-            </div>
+              </small>
+            </span>
           </Link>
 
           <div className="flex items-center gap-4">
-            <div className="hidden sm:flex items-center gap-3 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800">
-              <div className="w-7 h-7 rounded-lg bg-indigo-600/20 text-indigo-400 flex items-center justify-center font-bold text-xs">
-                {student?.studentName ? student.studentName.charAt(0) : "S"}
+            <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+              <div className="w-6 h-6 rounded-lg bg-indigo-600/30 border border-indigo-500/50 flex items-center justify-center font-bold text-indigo-300 uppercase">
+                {student?.studentName?.[0] || "S"}
               </div>
-              <div className="text-left">
-                <p className="text-xs font-bold text-white leading-none">
-                  {student?.studentName || "Aiden Vance"}
-                </p>
-                <p className="text-[10px] text-slate-400 font-mono mt-0.5">
-                  ID: {studentId}
-                </p>
+              <div className="hidden sm:block text-left">
+                <strong className="block text-white font-bold leading-tight">{student?.studentName || "Student"}</strong>
+                <span className="text-[10px] text-slate-400 font-mono">ID: {student?.studentId || "VVA-STU"}</span>
               </div>
             </div>
 
-            <button
-              onClick={handleSignOut}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/40 text-xs font-bold transition-colors"
+            <Link
+              href="/login"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors"
             >
-              <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Sign Out</span>
-            </button>
+              <LogOut className="h-3.5 w-3.5" /> Sign Out
+            </Link>
           </div>
         </div>
       </header>
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-8 space-y-8">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-900/60 via-slate-900 to-indigo-950 border border-indigo-500/30 p-6 sm:p-8 shadow-2xl">
-          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-xs font-semibold">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-indigo-500/30 p-6 sm:p-8 shadow-2xl">
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-xs font-semibold mb-2">
                 <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                Academic Term 2026 • Cambridge Advanced Track
+                Live Cloud Synced • Student Academic Hub
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                Welcome back, {student?.studentName || "Aiden Vance"}! 👋
+                Welcome back, {student?.studentName || "Student"} 👋
               </h1>
-              <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
+              <p className="text-xs sm:text-sm text-slate-300 mt-1">
                 Your portal synchronized live with the teacher office. View grades, turn in homework assignments, and keep track of your schedule.
               </p>
             </div>
-
-            <div className="flex items-center gap-3 shrink-0">
-              <div className="bg-slate-950/80 border border-indigo-500/30 rounded-2xl p-4 text-center min-w-[110px]">
-                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
-                  Overall Score
-                </span>
-                <strong className="text-2xl font-black text-emerald-400 mt-0.5 block">
-                  {avgScore}%
-                </strong>
-              </div>
-              <div className="bg-slate-950/80 border border-indigo-500/30 rounded-2xl p-4 text-center min-w-[110px]">
-                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
-                  Attendance
-                </span>
-                <strong className="text-2xl font-black text-indigo-400 mt-0.5 block">
-                  {attendancePercentage}%
-                </strong>
-              </div>
-            </div>
           </div>
-          <div className="absolute -right-12 -bottom-12 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
         </div>
 
         <nav className="flex items-center gap-2 border-b border-slate-800 pb-3 overflow-x-auto">
           {[
             { key: "overview", label: "Dashboard Overview", icon: BarChart3 },
-            { key: "assignments", label: "Assignments & Homework", icon: FileText, badge: pendingAssignments },
+            { key: "assignments", label: "Assignments & Homework", icon: FileText, badge: pendingCount },
             { key: "grades", label: "Grades & Results", icon: Award },
             { key: "timetable", label: "Class Timetable", icon: CalendarDays },
             { key: "attendance", label: "Attendance Record", icon: CheckCircle2 },
@@ -311,514 +250,361 @@ export default function StudentPortalPage() {
           })}
         </nav>
 
+        {/* DASHBOARD OVERVIEW TAB */}
         {tab === "overview" && (
           <div className="space-y-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              <div
-                onClick={() => setTab("grades")}
-                className="bg-slate-900 border border-slate-800 hover:border-indigo-500/50 rounded-2xl p-5 cursor-pointer transition-all hover:scale-[1.02] group"
-              >
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-slate-400">Average Performance</span>
-                  <div className="w-9 h-9 rounded-xl bg-indigo-950 border border-indigo-500/30 flex items-center justify-center text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-950 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
                     <Award className="w-4 h-4" />
                   </div>
                 </div>
-                <p className="text-2xl font-black text-white mt-3">{avgScore}%</p>
-                <p className="text-[11px] text-emerald-400 font-medium mt-1 flex items-center gap-1">
-                  <Check className="w-3 h-3" /> Grade A Standard
-                </p>
+                <p className="text-2xl font-black text-white mt-3">{calculateAveragePerformance(displayResults)}</p>
+                <p className="text-[11px] text-emerald-400 font-semibold mt-1">✓ Grade A Standard</p>
               </div>
 
-              <div
-                onClick={() => setTab("assignments")}
-                className="bg-slate-900 border border-slate-800 hover:border-indigo-500/50 rounded-2xl p-5 cursor-pointer transition-all hover:scale-[1.02] group"
-              >
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-slate-400">Pending Homework</span>
-                  <div className="w-9 h-9 rounded-xl bg-amber-950 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors">
+                  <div className="w-8 h-8 rounded-xl bg-amber-950 border border-amber-500/30 flex items-center justify-center text-amber-400">
                     <FileText className="w-4 h-4" />
                   </div>
                 </div>
-                <p className="text-2xl font-black text-white mt-3">{pendingAssignments}</p>
-                <p className="text-[11px] text-amber-400 font-medium mt-1">Requires student submission</p>
+                <p className="text-2xl font-black text-white mt-3">{pendingCount}</p>
+                <p className="text-[11px] text-amber-400 font-semibold mt-1">
+                  {pendingCount > 0 ? "Requires student submission" : "All caught up!"}
+                </p>
               </div>
 
-              <div
-                onClick={() => setTab("attendance")}
-                className="bg-slate-900 border border-slate-800 hover:border-indigo-500/50 rounded-2xl p-5 cursor-pointer transition-all hover:scale-[1.02] group"
-              >
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-slate-400">Class Attendance</span>
-                  <div className="w-9 h-9 rounded-xl bg-emerald-950 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:bg-emerald-500 group-hover:text-slate-950 transition-colors">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-950 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
                     <CheckCircle2 className="w-4 h-4" />
                   </div>
                 </div>
-                <p className="text-2xl font-black text-white mt-3">{attendancePercentage}%</p>
-                <p className="text-[11px] text-emerald-400 font-medium mt-1">Excellent attendance record</p>
+                <p className="text-2xl font-black text-white mt-3">{calculateAttendancePercentage()}</p>
+                <p className="text-[11px] text-emerald-400 font-semibold mt-1">Excellent attendance record</p>
               </div>
 
-              <div
-                onClick={() => setTab("timetable")}
-                className="bg-slate-900 border border-slate-800 hover:border-indigo-500/50 rounded-2xl p-5 cursor-pointer transition-all hover:scale-[1.02] group"
-              >
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-slate-400">Active Subjects</span>
-                  <div className="w-9 h-9 rounded-xl bg-blue-950 border border-blue-500/30 flex items-center justify-center text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                  <div className="w-8 h-8 rounded-xl bg-blue-950 border border-blue-500/30 flex items-center justify-center text-blue-400">
                     <BookOpen className="w-4 h-4" />
                   </div>
                 </div>
-                <p className="text-2xl font-black text-white mt-3">
-                  {records.results.length || 3} Courses
-                </p>
-                <p className="text-[11px] text-blue-400 font-medium mt-1">Cambridge AS / A-Level Track</p>
+                <p className="text-2xl font-black text-white mt-3">{displayResults.length} Courses</p>
+                <p className="text-[11px] text-blue-400 font-semibold mt-1">Cambridge AS / A-Level Track</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Recent Subject Results (Dynamic) */}
               <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-                  <div className="flex items-center gap-2">
-                    <Award className="w-5 h-5 text-indigo-400" />
-                    <h2 className="text-base font-bold text-white">Recent Subject Results</h2>
-                  </div>
-                  <button
-                    onClick={() => setTab("grades")}
-                    className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
-                  >
-                    View All <ChevronRight className="w-3.5 h-3.5" />
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Award className="w-4 h-4 text-indigo-400" /> Recent Subject Results
+                  </h3>
+                  <button onClick={() => setTab("grades")} className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1">
+                    View All <ChevronRight className="w-3 h-3" />
                   </button>
                 </div>
 
                 <div className="space-y-3">
-                  {records.results.length > 0 ? (
-                    records.results.slice(0, 3).map((res) => (
-                      <div
-                        key={res.id}
-                        className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-4 hover:border-slate-700 transition-colors"
-                      >
-                        <div>
-                          <strong className="block text-sm text-white font-bold">{res.course}</strong>
-                          <p className="text-xs text-slate-400 mt-0.5">
-                            Code: {res.code} • {res.feedback || "Grade published by teacher"}
-                          </p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <span className="text-sm font-extrabold text-emerald-400 block">{res.score}</span>
-                          <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800/40 inline-block mt-1">
-                            Grade {res.grade}
-                          </span>
-                        </div>
+                  {displayResults.map((item) => (
+                    <div key={item.id} className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-4">
+                      <div>
+                        <strong className="block text-sm font-bold text-white">{item.course}</strong>
+                        <p className="text-xs text-slate-400 mt-0.5">Code: {item.code} • {item.feedback}</p>
                       </div>
-                    ))
-                  ) : (
-                    <div className="p-6 text-center text-xs text-slate-400 bg-slate-950 rounded-2xl border border-slate-800">
-                      No results published yet. Check back when your teacher updates the portal!
+                      <div className="text-right shrink-0">
+                        <strong className="block text-sm font-extrabold text-emerald-400">{item.score}</strong>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800/40">
+                          GRADE {item.grade}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+
+                  {displayResults.length === 0 && (
+                    <div className="p-6 text-center text-xs text-slate-500 italic bg-slate-950 rounded-2xl border border-slate-800">
+                      No grades published by teacher yet.
                     </div>
                   )}
                 </div>
               </div>
 
+              {/* Pending Assignments (Dynamic) */}
               <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-amber-400" />
-                    <h2 className="text-base font-bold text-white">Pending Assignments</h2>
-                  </div>
-                  <button
-                    onClick={() => setTab("assignments")}
-                    className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
-                  >
-                    Assignment Hub <ChevronRight className="w-3.5 h-3.5" />
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-amber-400" /> Pending Assignments
+                  </h3>
+                  <button onClick={() => setTab("assignments")} className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1">
+                    Assignment Hub <ChevronRight className="w-3 h-3" />
                   </button>
                 </div>
 
                 <div className="space-y-3">
-                  {assignments.slice(0, 3).map((asg) => (
-                    <div
-                      key={asg.id}
-                      onClick={() => {
-                        setSelectedAssignment(asg);
-                        setTab("assignments");
-                      }}
-                      className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-4 cursor-pointer hover:border-amber-500/40 transition-colors"
-                    >
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider block">
-                          {asg.course}
+                  {assignments.map((asg) => (
+                    <div key={asg.id} className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">{asg.course}</span>
+                          <strong className="block text-xs font-bold text-white mt-0.5">{asg.title}</strong>
+                        </div>
+                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${asg.status === "graded" ? "bg-emerald-950 text-emerald-300" : asg.status === "submitted" ? "bg-blue-950 text-blue-300" : "bg-amber-950 text-amber-300"}`}>
+                          {asg.status.toUpperCase()}
                         </span>
-                        <strong className="text-xs font-bold text-white block line-clamp-1">
-                          {asg.title}
-                        </strong>
-                        <p className="text-[11px] text-slate-400 flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-slate-500" /> Due: {asg.dueDate}
-                        </p>
                       </div>
-
-                      <span
-                        className={`text-[10px] uppercase font-extrabold px-2.5 py-1 rounded-full shrink-0 ${
-                          asg.status === "graded"
-                            ? "bg-emerald-950 text-emerald-300 border border-emerald-800/50"
-                            : asg.status === "submitted"
-                            ? "bg-blue-950 text-blue-300 border border-blue-800/50"
-                            : "bg-amber-950 text-amber-300 border border-amber-800/50"
-                        }`}
-                      >
-                        {asg.status}
-                      </span>
+                      <p className="text-[11px] text-slate-400 flex items-center gap-1 pt-1">
+                        <Clock className="w-3 h-3 text-amber-400" /> Due: {asg.dueDate}
+                      </p>
                     </div>
                   ))}
+
+                  {assignments.length === 0 && (
+                    <div className="p-6 text-center text-xs text-slate-500 italic bg-slate-950 rounded-2xl border border-slate-800">
+                      No assignments found for your account.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           </div>
         )}
 
+        {/* ASSIGNMENTS & HOMEWORK TAB */}
         {tab === "assignments" && (
-          <div className="space-y-6">
-            {submitMessage && (
-              <div className="p-4 rounded-2xl bg-emerald-950/70 border border-emerald-500/40 text-emerald-300 text-xs font-semibold flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>{submitMessage}</span>
-              </div>
-            )}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-5 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
+                Assigned Homework ({assignments.length})
+              </h3>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              <div className="lg:col-span-5 space-y-3">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
-                  Assigned Homework ({assignments.length})
-                </h3>
-
-                <div className="space-y-3">
-                  {assignments.map((asg) => {
-                    const isSelected = selectedAssignment?.id === asg.id;
-                    return (
-                      <div
-                        key={asg.id}
-                        onClick={() => setSelectedAssignment(asg)}
-                        className={`p-5 rounded-2xl border cursor-pointer transition-all ${
-                          isSelected
-                            ? "bg-indigo-950/40 border-indigo-500 text-white shadow-xl"
-                            : "bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">
-                            {asg.course}
-                          </span>
-                          <span
-                            className={`text-[10px] uppercase font-extrabold px-2 py-0.5 rounded ${
-                              asg.status === "graded"
-                                ? "bg-emerald-950 text-emerald-300 border border-emerald-800/50"
-                                : asg.status === "submitted"
-                                ? "bg-blue-950 text-blue-300 border border-blue-800/50"
-                                : "bg-amber-950 text-amber-300 border border-amber-800/50"
-                            }`}
-                          >
-                            {asg.status}
-                          </span>
-                        </div>
-
-                        <strong className="block text-sm font-bold mt-2 leading-snug">
-                          {asg.title}
-                        </strong>
-
-                        <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-800/60 text-[11px] text-slate-400">
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5 text-slate-500" /> Due {asg.dueDate}
-                          </span>
-                          <span className="font-semibold text-slate-300">
-                            {asg.score || "100 pts"}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="lg:col-span-7">
-                {selectedAssignment ? (
-                  <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6">
-                    <div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">
-                          {selectedAssignment.course}
-                        </span>
-                        <span className="text-xs text-slate-400">
-                          Score / Weight: <strong>{selectedAssignment.score || "100 pts"}</strong>
+              <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                {assignments.map((asg) => {
+                  const isSelected = selectedAsg?.id === asg.id;
+                  return (
+                    <div
+                      key={asg.id}
+                      onClick={() => setSelectedAsg(asg)}
+                      className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                        isSelected
+                          ? "bg-indigo-950/40 border-indigo-500 text-white shadow-xl"
+                          : "bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">{asg.course}</span>
+                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${asg.status === "graded" ? "bg-emerald-950 text-emerald-300" : asg.status === "submitted" ? "bg-blue-950 text-blue-300" : "bg-amber-950 text-amber-300"}`}>
+                          {asg.status.toUpperCase()}
                         </span>
                       </div>
-                      <h2 className="text-xl font-extrabold text-white mt-1">
-                        {selectedAssignment.title}
-                      </h2>
-                      <p className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-amber-400" /> Target Deadline: {selectedAssignment.dueDate}
-                      </p>
+                      <strong className="block text-xs font-bold text-white mt-1">{asg.title}</strong>
+                      <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-800 text-[11px] text-slate-400">
+                        <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-amber-400" /> Due {asg.dueDate}</span>
+                        <span>{asg.score}</span>
+                      </div>
                     </div>
+                  );
+                })}
 
-                    <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
-                      <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                        Teacher Instructions
-                      </h4>
-                      <p className="text-xs text-slate-300 leading-relaxed">
-                        {selectedAssignment.instructions}
-                      </p>
-                    </div>
-
-                    {selectedAssignment.status === "graded" && (
-                      <div className="p-5 rounded-2xl bg-emerald-950/30 border border-emerald-500/30 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
-                            <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Graded by Teacher
-                          </span>
-                          <strong className="text-sm text-emerald-300">
-                            Score: {selectedAssignment.score || "Pass"}
-                          </strong>
-                        </div>
-                        {selectedAssignment.feedback && (
-                          <div className="text-xs text-slate-300 pt-2 border-t border-emerald-800/40 flex items-start gap-2">
-                            <MessageSquare className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                            <span><strong>Feedback:</strong> {selectedAssignment.feedback}</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {selectedAssignment.status === "submitted" && (
-                      <div className="p-5 rounded-2xl bg-blue-950/30 border border-blue-500/30 space-y-2">
-                        <span className="text-xs font-bold text-blue-300 uppercase tracking-wider flex items-center gap-1.5">
-                          <Check className="w-4 h-4 text-blue-400" /> Work Turned In
-                        </span>
-                        <p className="text-xs text-slate-300">
-                          {submittedTexts[selectedAssignment.id] || "Your assignment has been submitted successfully."}
-                        </p>
-                        <p className="text-[11px] text-slate-400 pt-2 border-t border-blue-900/50">
-                          Your submission is pending evaluation by the teacher.
-                        </p>
-                      </div>
-                    )}
-
-                    {selectedAssignment.status === "pending" && (
-                      <form onSubmit={handleSubmitAssignment} className="space-y-4 pt-4 border-t border-slate-800">
-                        <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                          <Send className="w-4 h-4 text-indigo-400" /> Submit Student Homework
-                        </h4>
-
-                        <div>
-                          <label className="block text-xs text-slate-400 mb-1 font-semibold">
-                            Written Answer / Explanation
-                          </label>
-                          <textarea
-                            rows={3}
-                            value={submissionInput}
-                            onChange={(e) => setSubmissionInput(e.target.value)}
-                            placeholder="Type your response, links to documents, or solution explanation here..."
-                            className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-indigo-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs text-slate-400 mb-1 font-semibold">
-                            Attach Work File (PDF, DOCX, ZIP)
-                          </label>
-                          <div className="flex items-center gap-3">
-                            <label className="flex items-center gap-2 px-4 py-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-700 rounded-xl cursor-pointer text-xs font-semibold text-slate-300 transition-colors">
-                              <Upload className="w-4 h-4 text-indigo-400" />
-                              <span>{fileName ? fileName : "Choose Document..."}</span>
-                              <input
-                                type="file"
-                                className="hidden"
-                                onChange={(e) => {
-                                  if (e.target.files && e.target.files[0]) {
-                                    setFileName(e.target.files[0].name);
-                                  }
-                                }}
-                              />
-                            </label>
-                            {fileName && (
-                              <button
-                                type="button"
-                                onClick={() => setFileName("")}
-                                className="text-xs text-rose-400 hover:underline"
-                              >
-                                Remove
-                              </button>
-                            )}
-                          </div>
-                        </div>
-
-                        <button
-                          type="submit"
-                          className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/30 transition-colors flex items-center justify-center gap-2"
-                        >
-                          <Send className="w-4 h-4" /> Turn In Assignment
-                        </button>
-                      </form>
-                    )}
-                  </div>
-                ) : (
-                  <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 text-center text-xs text-slate-400">
-                    Select an assignment on the left to view requirements and submit.
+                {assignments.length === 0 && (
+                  <div className="p-8 text-center text-xs text-slate-400 bg-slate-900 rounded-2xl border border-slate-800">
+                    No homework assigned yet.
                   </div>
                 )}
               </div>
             </div>
-          </div>
-        )}
 
-        {tab === "grades" && (
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
-              <div>
-                <h2 className="text-xl font-extrabold text-white">Academic Results & Grades</h2>
-                <p className="text-xs text-slate-400 mt-1">
-                  Official course evaluation marks updated by the academy administration.
-                </p>
-              </div>
+            <div className="lg:col-span-7">
+              {selectedAsg ? (
+                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6">
+                  <div className="border-b border-slate-800 pb-4">
+                    <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">{selectedAsg.course}</span>
+                    <h2 className="text-xl font-extrabold text-white mt-1">{selectedAsg.title}</h2>
+                    <p className="text-xs text-slate-400 mt-1 flex items-center gap-2">
+                      <Clock className="w-3.5 h-3.5 text-amber-400" /> Target Deadline: {selectedAsg.dueDate} • <span className="text-indigo-300 font-semibold">{selectedAsg.score}</span>
+                    </p>
+                  </div>
 
-              <div className="px-4 py-2 bg-indigo-950/60 border border-indigo-500/30 rounded-2xl flex items-center gap-3">
-                <Award className="w-5 h-5 text-indigo-400" />
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Average Score</span>
-                  <strong className="text-sm text-emerald-400">{avgScore}% (A Standard)</strong>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4">
-              {records.results.length > 0 ? (
-                records.results.map((res) => (
-                  <div
-                    key={res.id}
-                    className="p-5 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-slate-700 transition-colors"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-950 text-indigo-300 border border-indigo-800/40 font-mono">
-                          {res.code}
-                        </span>
-                        <strong className="text-sm font-bold text-white">{res.course}</strong>
-                      </div>
-                      <p className="text-xs text-slate-400 leading-relaxed pt-1">
-                        {res.feedback || "Good progress and consistency demonstrated across course work."}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-4 shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-800">
-                      <div className="text-right">
-                        <span className="text-xs text-slate-400 block">Achieved Score</span>
-                        <strong className="text-lg font-black text-emerald-400">{res.score}</strong>
-                      </div>
-                      <div className="w-12 h-12 rounded-2xl bg-emerald-950/80 border border-emerald-500/40 flex items-center justify-center text-emerald-300 font-black text-lg">
-                        {res.grade}
-                      </div>
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Teacher Instructions</h4>
+                    <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-slate-300 leading-relaxed">
+                      {selectedAsg.instructions}
                     </div>
                   </div>
-                ))
+
+                  {selectedAsg.feedback && (
+                    <div className="p-4 rounded-2xl bg-emerald-950/30 border border-emerald-500/30 space-y-1">
+                      <strong className="text-xs font-bold text-emerald-400 block">Teacher Review & Feedback:</strong>
+                      <p className="text-xs text-emerald-200">{selectedAsg.feedback}</p>
+                    </div>
+                  )}
+
+                  {selectedAsg.status === "submitted" ? (
+                    <div className="p-5 rounded-2xl bg-blue-950/30 border border-blue-500/30 space-y-2 text-xs">
+                      <strong className="text-blue-300 font-bold flex items-center gap-2">
+                        <Check className="w-4 h-4 text-emerald-400" /> Homework Turned In Successfully!
+                      </strong>
+                      <p className="text-slate-300">Submitted on: {new Date(selectedAsg.submittedAt || "").toLocaleString()}</p>
+                      {selectedAsg.submissionNotes && <p className="text-slate-400 italic">"{selectedAsg.submissionNotes}"</p>}
+                    </div>
+                  ) : selectedAsg.status === "pending" ? (
+                    <form onSubmit={handleTurnInAssignment} className="space-y-4 pt-2">
+                      <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <Send className="w-3.5 h-3.5 text-indigo-400" /> Submit Student Homework
+                      </h4>
+
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Written Answer / Explanation</label>
+                        <textarea
+                          rows={4}
+                          value={submissionText}
+                          onChange={(e) => setSubmissionText(e.target.value)}
+                          placeholder="Type your response, links to documents, or solution explanation here..."
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Attach Work File (PDF, DOCX, ZIP)</label>
+                        <input
+                          type="file"
+                          id="file-upload"
+                          className="hidden"
+                          onChange={(e) => setAttachedFile(e.target.files?.[0] || null)}
+                        />
+                        <label
+                          htmlFor="file-upload"
+                          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs font-semibold text-slate-300 hover:text-white cursor-pointer"
+                        >
+                          <Paperclip className="w-4 h-4 text-indigo-400" />
+                          {attachedFile ? attachedFile.name : "Choose Document..."}
+                        </label>
+                      </div>
+
+                      {submitSuccess && (
+                        <p className="text-xs font-bold text-emerald-400 flex items-center gap-1">
+                          <Check className="w-4 h-4" /> Homework submitted to teacher!
+                        </p>
+                      )}
+
+                      <button
+                        type="submit"
+                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/30 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Send className="w-4 h-4" /> Turn In Assignment
+                      </button>
+                    </form>
+                  ) : null}
+                </div>
               ) : (
-                <div className="p-8 text-center text-xs text-slate-400 bg-slate-950 rounded-2xl border border-slate-800">
-                  No academic results recorded yet.
+                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 text-center text-xs text-slate-400">
+                  Select an assignment from the list.
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {tab === "timetable" && (
+        {/* GRADES & RESULTS TAB */}
+        {tab === "grades" && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6">
-            <div>
-              <h2 className="text-xl font-extrabold text-white">Weekly Class Schedule</h2>
-              <p className="text-xs text-slate-400 mt-1">
-                Scheduled live lectures and virtual cohort sessions.
-              </p>
+            <div className="border-b border-slate-800 pb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-white">Academic Results & Grades</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Official course evaluation marks updated by the academy administration.</p>
+              </div>
+              <div className="bg-indigo-950 border border-indigo-500/30 px-4 py-2 rounded-2xl text-right">
+                <span className="text-[10px] font-semibold text-indigo-400 uppercase tracking-wider block">Average Score</span>
+                <strong className="text-lg font-black text-emerald-400">{calculateAveragePerformance(displayResults)}</strong>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"].map((dayName) => {
-                const dayClasses = records.schedule.filter((s) => s.day === dayName);
-                return (
-                  <div key={dayName} className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                      <strong className="text-xs font-bold text-indigo-400 uppercase tracking-wider">
-                        {dayName}
-                      </strong>
-                      <span className="text-[10px] text-slate-500">{dayClasses.length} Sessions</span>
-                    </div>
-
-                    <div className="space-y-2.5">
-                      {dayClasses.length > 0 ? (
-                        dayClasses.map((item) => (
-                          <div key={item.id} className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
-                            <span className="text-[10px] font-mono text-amber-400 flex items-center gap-1">
-                              <Clock className="w-3 h-3" /> {item.time}
-                            </span>
-                            <strong className="block text-xs font-bold text-white">{item.course}</strong>
-                            <p className="text-[11px] text-slate-400">
-                              Topic: {item.topic} • {item.teacher || "Faculty Instructor"}
-                            </p>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-[11px] text-slate-500 italic py-2">No scheduled lectures</p>
-                      )}
-                    </div>
+            <div className="space-y-4">
+              {displayResults.map((item) => (
+                <div key={item.id} className="p-5 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800/40">
+                      {item.code}
+                    </span>
+                    <strong className="block text-base font-bold text-white mt-1">{item.course}</strong>
+                    <p className="text-xs text-slate-400">{item.feedback}</p>
                   </div>
-                );
-              })}
+
+                  <div className="text-right shrink-0">
+                    <span className="text-xs text-slate-400 block font-semibold mb-0.5">Achieved Score</span>
+                    <strong className="text-xl font-black text-emerald-400">{item.score}</strong>
+                    <span className="ml-2 text-xs font-black px-2.5 py-1 rounded bg-emerald-950 text-emerald-300 border border-emerald-800/50">
+                      {item.grade}
+                    </span>
+                  </div>
+                </div>
+              ))}
+
+              {displayResults.length === 0 && (
+                <div className="p-8 text-center text-xs text-slate-500 italic bg-slate-950 rounded-2xl border border-slate-800">
+                  No academic grades logged yet.
+                </div>
+              )}
             </div>
           </div>
         )}
 
+        {/* TIMETABLE TAB */}
+        {tab === "timetable" && (
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6">
+            <div className="border-b border-slate-800 pb-4">
+              <h3 className="text-lg font-bold text-white">Class Schedule & Timetable</h3>
+              <p className="text-xs text-slate-400 mt-0.5">Live class schedule and instructor details.</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {records?.schedule.map((item) => (
+                <div key={item.id} className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 px-2 py-0.5 bg-amber-950 rounded border border-amber-800/40">
+                    {item.day} • {item.time}
+                  </span>
+                  <strong className="block text-sm font-bold text-white mt-2">{item.course}</strong>
+                  <p className="text-xs text-slate-400">Topic: {item.topic}</p>
+                  <p className="text-xs text-indigo-400 font-semibold pt-1">Instructor: {item.teacher}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ATTENDANCE TAB */}
         {tab === "attendance" && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+            <div className="border-b border-slate-800 pb-4 flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-extrabold text-white">Attendance Log</h2>
-                <p className="text-xs text-slate-400 mt-1">
-                  Live record of lecture participation and attendance.
-                </p>
+                <h3 className="text-lg font-bold text-white">Attendance Log</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Record of class presence and punctuality.</p>
               </div>
-
-              <div className="px-4 py-2 bg-emerald-950/60 border border-emerald-500/30 rounded-2xl flex items-center gap-3">
-                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Attendance Rate</span>
-                  <strong className="text-sm text-emerald-400">{attendancePercentage}% Present</strong>
-                </div>
+              <div className="bg-emerald-950 border border-emerald-500/30 px-4 py-2 rounded-2xl text-right">
+                <span className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wider block">Attendance Score</span>
+                <strong className="text-lg font-black text-emerald-300">{calculateAttendancePercentage()}</strong>
               </div>
             </div>
 
             <div className="space-y-3">
-              {records.attendance.length > 0 ? (
-                records.attendance.map((item) => (
-                  <div
-                    key={item.id}
-                    className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-4"
-                  >
-                    <div>
-                      <strong className="block text-xs font-bold text-white">{item.course}</strong>
-                      <span className="text-[11px] text-slate-400">{item.date}</span>
-                    </div>
-
-                    <span
-                      className={`text-xs font-bold px-3 py-1 rounded-full ${
-                        item.status === "Present"
-                          ? "bg-emerald-950 text-emerald-300 border border-emerald-800/50"
-                          : item.status === "Late"
-                          ? "bg-amber-950 text-amber-300 border border-amber-800/50"
-                          : "bg-rose-950 text-rose-300 border border-rose-800/50"
-                      }`}
-                    >
-                      {item.status}
-                    </span>
+              {records?.attendance.map((item) => (
+                <div key={item.id} className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <strong className="block text-sm font-bold text-white">{item.course}</strong>
+                    <span className="text-xs text-slate-400">{item.date}</span>
                   </div>
-                ))
-              ) : (
-                <div className="p-8 text-center text-xs text-slate-400 bg-slate-950 rounded-2xl border border-slate-800">
-                  No attendance records log published yet.
+                  <span className={`text-xs font-bold px-3 py-1 rounded-full ${item.status === "Present" ? "bg-emerald-950 text-emerald-300 border border-emerald-800/40" : "bg-amber-950 text-amber-300 border border-amber-800/40"}`}>
+                    {item.status}
+                  </span>
                 </div>
-              )}
+              ))}
             </div>
           </div>
         )}
