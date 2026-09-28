@@ -167,7 +167,7 @@ export interface Course {
   description?: any;
   category?: string;
   prerequisites?: any;
-  syllabus?: any;
+  syllabus?: string[] | any[];
   duration?: string;
   instructor?: any;
   schedule?: string;

@@ -314,7 +314,7 @@ export default function CoursesPage() {
                   Key Modules & Syllabus Breakdown
                 </h4>
                 <ul className="space-y-2 text-xs text-slate-300">
-                  {activeCourseModal.syllabus.map((item, idx) => (
+                  {activeCourseModal.syllabus.map((item: any, idx: number) => (
                     <li key={idx} className="flex items-start gap-2 bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
                       <span>{item}</span>
