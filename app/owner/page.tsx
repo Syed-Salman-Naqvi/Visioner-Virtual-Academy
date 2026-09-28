@@ -46,11 +46,13 @@ export default function OwnerDashboardPage() {
 
 
   useEffect(() => {
-  async function fetchApps() {
+  async function loadData() {
     const apps = await getSavedApplications();
     setApplications(apps);
+    const accounts = await getStudentAccounts();
+    setStudentAccounts(accounts);
   }
-  fetchApps();
+  loadData();
 }, []);
 
 
@@ -216,18 +218,21 @@ export default function OwnerDashboardPage() {
     </label>
   );
 
-  const handleOwnerLogin = (event: React.FormEvent) => {
-    event.preventDefault();
-    if (ownerId.trim() === "Muhammad-Salman" && ownerPassword.trim() === "123123") {
-      window.sessionStorage.setItem(OWNER_SESSION_KEY, "true");
-      setLoginError("");
-      window.dispatchEvent(new Event(OWNER_AUTH_EVENT));
-      setApplications(getSavedApplications());
-      setStudentAccounts(getStudentAccounts());
-      return;
-    }
-    setLoginError("The ID or password is incorrect.");
-  };
+  const handleOwnerLogin = async (event: React.FormEvent) => {
+  event.preventDefault();
+  if (ownerId.trim() === "Muhammad-Salman" && ownerPassword.trim() === "123123") {
+    window.sessionStorage.setItem(OWNER_SESSION_KEY, "true");
+    setLoginError("");
+    window.dispatchEvent(new Event(OWNER_AUTH_EVENT));
+
+    const apps = await getSavedApplications();
+    const accounts = await getStudentAccounts();
+    setApplications(apps);
+    setStudentAccounts(accounts);
+    return;
+  }
+  setLoginError("The ID or password is incorrect.");
+};
 
   const signOut = () => {
     window.sessionStorage.removeItem(OWNER_SESSION_KEY);
