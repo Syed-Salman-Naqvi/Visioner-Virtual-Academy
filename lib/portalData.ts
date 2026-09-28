@@ -1,12 +1,70 @@
 import { supabase } from './supabase';
-import { getStoredApplications } from './storage';
+import { getSavedApplications } from './storage';
 
+// Interfaces required by app/owner/page.tsx and app/student/page.tsx
+export interface AcademicResult {
+  id: string;
+  subject: string;
+  code: string;
+  grade: string;
+  status: string;
+}
+
+export interface AttendanceRecord {
+  subject: string;
+  totalClasses: number;
+  attended: number;
+  percentage: string;
+}
+
+export interface ScheduleRecord {
+  day: string;
+  time: string;
+  subject: string;
+  teacher: string;
+}
+
+export interface AssignmentRecord {
+  id: string;
+  subjectCode: string;
+  title: string;
+  dueDate: string;
+  status: string;
+}
+
+export interface StudentInfoRecord {
+  id: string;
+  name: string;
+  email: string;
+  program: string;
+  avatar?: string;
+  enrolledDate?: string;
+  status?: string;
+}
+
+export interface StatsRecord {
+  averagePerformance: string;
+  pendingHomework: number;
+  classAttendance: string;
+  activeSubjectsCount: number;
+}
+
+export interface PortalRecords {
+  studentInfo: StudentInfoRecord;
+  stats: StatsRecord;
+  recentResults: AcademicResult[];
+  pendingAssignments: AssignmentRecord[];
+  timetable: ScheduleRecord[];
+  attendance: AttendanceRecord[];
+}
+
+// Dynamic Profile Generator (Uses student's real name, email, program, ID)
 export const createDynamicStudentProfile = (studentInfo: {
   id: string;
   name: string;
   email: string;
   program?: string;
-}) => {
+}): PortalRecords => {
   return {
     studentInfo: {
       id: studentInfo.id,
@@ -77,13 +135,70 @@ export const createDynamicStudentProfile = (studentInfo: {
   };
 };
 
-export async function getStudentPortalData(studentId: string, sessionUser?: any) {
+// Functions required by app/owner/page.tsx
+const PORTAL_STORAGE_KEY = 'vva_portal_records_db';
+
+export function getPortalRecords(): Record<string, PortalRecords> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const data = localStorage.getItem(PORTAL_STORAGE_KEY);
+    return data ? JSON.parse(data) : {};
+  } catch (err) {
+    console.error('Error reading portal records:', err);
+    return {};
+  }
+}
+
+export function savePortalRecords(records: Record<string, PortalRecords>): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(PORTAL_STORAGE_KEY, JSON.stringify(records));
+  } catch (err) {
+    console.error('Error saving portal records:', err);
+  }
+}
+
+export function getStudentPortalRecords(studentId: string): PortalRecords | null {
+  const allRecords = getPortalRecords();
+  return allRecords[studentId] || null;
+}
+
+export function saveStudentPortalRecords(studentId: string, records: PortalRecords): void {
+  const allRecords = getPortalRecords();
+  allRecords[studentId] = records;
+  savePortalRecords(allRecords);
+}
+
+export function migrateStudentPortalRecords(studentId?: string): Record<string, PortalRecords> {
+  const allRecords = getPortalRecords();
+  if (studentId && !allRecords[studentId]) {
+    allRecords[studentId] = createDynamicStudentProfile({
+      id: studentId,
+      name: 'Enrolled Student',
+      email: '',
+    });
+    savePortalRecords(allRecords);
+  }
+  return allRecords;
+}
+
+// Main loader used by app/student/page.tsx
+export async function getStudentPortalData(studentId: string, sessionUser?: any): Promise<PortalRecords | null> {
   if (!studentId && !sessionUser) return null;
 
   const activeId = studentId || sessionUser?.id || sessionUser?.studentId;
   const activeName = sessionUser?.name || sessionUser?.studentName;
 
-  // 1. Query Supabase 'students' table
+  // 1. Check local saved portal records (e.g. owner portal edits)
+  const savedRecord = getStudentPortalRecords(activeId);
+  if (savedRecord) {
+    if (activeName && savedRecord.studentInfo) {
+      savedRecord.studentInfo.name = activeName;
+    }
+    return savedRecord;
+  }
+
+  // 2. Query Supabase 'students' table
   try {
     const { data: dbStudent } = await supabase
       .from('students')
@@ -92,18 +207,20 @@ export async function getStudentPortalData(studentId: string, sessionUser?: any)
       .single();
 
     if (dbStudent) {
-      return createDynamicStudentProfile({
+      const profile = createDynamicStudentProfile({
         id: dbStudent.student_id || dbStudent.id || activeId,
         name: dbStudent.name || dbStudent.full_name || dbStudent.student_name || activeName || 'Enrolled Student',
         email: dbStudent.email || sessionUser?.email || '',
         program: dbStudent.program || dbStudent.target_program || sessionUser?.program,
       });
+      saveStudentPortalRecords(activeId, profile);
+      return profile;
     }
   } catch (err) {
-    // Continue to next check
+    // Continue
   }
 
-  // 2. Query Supabase 'applications' table
+  // 3. Query Supabase 'applications' table
   try {
     const { data: dbApp } = await supabase
       .from('applications')
@@ -112,49 +229,62 @@ export async function getStudentPortalData(studentId: string, sessionUser?: any)
       .single();
 
     if (dbApp) {
-      return createDynamicStudentProfile({
+      const profile = createDynamicStudentProfile({
         id: dbApp.generated_student_id || dbApp.id || activeId,
         name: dbApp.student_name || dbApp.name || activeName || 'Enrolled Student',
         email: dbApp.student_email || dbApp.email || '',
         program: dbApp.target_program,
       });
+      saveStudentPortalRecords(activeId, profile);
+      return profile;
     }
   } catch (err) {
-    // Continue to next check
+    // Continue
   }
 
-  // 3. Query LocalStorage applications
-  const localApps = getStoredApplications();
-  const matchedApp = localApps.find(
-    (app: any) =>
-      app.generatedStudentId === activeId ||
-      app.id === activeId ||
-      app.studentEmail === activeId
-  );
+  // 4. Query LocalStorage applications via getSavedApplications
+  try {
+    const localApps = getSavedApplications();
+    if (Array.isArray(localApps)) {
+      const matchedApp = localApps.find(
+        (app: any) =>
+          app.generatedStudentId === activeId ||
+          app.id === activeId ||
+          app.studentEmail === activeId
+      );
 
-  if (matchedApp) {
-    return createDynamicStudentProfile({
-      id: matchedApp.generatedStudentId || matchedApp.id,
-      name: matchedApp.studentName || activeName,
-      email: matchedApp.studentEmail,
-      program: matchedApp.targetProgram,
-    });
+      if (matchedApp) {
+        const profile = createDynamicStudentProfile({
+          id: matchedApp.generatedStudentId || matchedApp.id,
+          name: matchedApp.studentName || activeName,
+          email: matchedApp.studentEmail,
+          program: matchedApp.targetProgram,
+        });
+        saveStudentPortalRecords(activeId, profile);
+        return profile;
+      }
+    }
+  } catch (err) {
+    // Continue
   }
 
-  // 4. Session user profile fallback
+  // 5. Active session user profile fallback
   if (sessionUser && (sessionUser.name || sessionUser.studentName)) {
-    return createDynamicStudentProfile({
+    const profile = createDynamicStudentProfile({
       id: activeId,
       name: sessionUser.name || sessionUser.studentName,
       email: sessionUser.email || '',
       program: sessionUser.program || sessionUser.targetProgram,
     });
+    saveStudentPortalRecords(activeId, profile);
+    return profile;
   }
 
-  // 5. General fallback using student ID alone
-  return createDynamicStudentProfile({
+  // 6. Fallback using student ID
+  const profile = createDynamicStudentProfile({
     id: activeId || 'VVA-STU-ACTIVE',
     name: activeName || 'Enrolled Student',
     email: sessionUser?.email || '',
   });
+  return profile;
 }
