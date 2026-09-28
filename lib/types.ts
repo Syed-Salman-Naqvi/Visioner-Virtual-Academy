@@ -157,29 +157,22 @@ export interface Assignment {
   [key: string]: any;
 }
 
+export type AcademicTrack = string;
+
 export interface Course {
   id: string;
   code: string;
   title: string;
   level?: string;
-  description?: string;
+  description?: any;
   category?: string;
-  prerequisites?: string[];
-  syllabus?: string[];
+  prerequisites?: any;
+  syllabus?: any;
   duration?: string;
-  instructor?: string;
+  instructor?: any;
   schedule?: string;
   image?: string;
   featured?: boolean;
-  [key: string]: any;
-}
-
-export interface AcademicTrack {
-  id: string;
-  name: string;
-  code?: string;
-  description?: string;
-  courses?: Course[] | string[];
   [key: string]: any;
 }
 
@@ -189,20 +182,26 @@ export interface FacultyMember {
   role: string;
   bio?: string;
   department?: string;
-  subjects?: string[];
+  subjects?: any;
   image?: string;
   email?: string;
-  qualifications?: string[];
+  qualifications?: any;
   [key: string]: any;
 }
 
 export interface TimetableEntry {
   id: string;
   day: string;
-  time: string;
-  course: string;
-  teacher?: string;
-  room?: string;
+  time?: string;
+  course?: string;
+  subject?: string;
   topic?: string;
+  teacher?: string;
+  teacherAvatar?: string;
+  baseTimeGst?: string;
+  roomCode?: string;
+  status?: string;
+  slidesAvailable?: boolean;
+  recordingAvailable?: boolean;
   [key: string]: any;
 }
