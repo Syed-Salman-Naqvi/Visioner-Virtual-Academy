@@ -121,9 +121,13 @@ export interface AdmissionsApplication {
   countryOfResidence?: string;
   city?: string;
   preferredCohortSlot?: string;
+  timeZone?: string;
+  assignedAdvisor?: string;
+  statementOfPurpose?: string;
   documentsAttached?: string[];
-  status: "Under Review" | "Verified" | "Interview Scheduled" | "Accepted";
+  status: "Under Review" | "Verified" | "Interview Scheduled" | "Accepted" | string;
   createdAt: string;
+  [key: string]: any;
 }
 
 export interface StudentAccount {
@@ -133,6 +137,7 @@ export interface StudentAccount {
   studentName: string;
   studentEmail: string;
   createdAt: string;
+  [key: string]: any;
 }
 
 export interface Assignment {
@@ -141,12 +146,63 @@ export interface Assignment {
   course: string;
   courseCode?: string;
   dueDate: string;
-  status: "pending" | "submitted" | "graded";
+  status: "pending" | "submitted" | "graded" | string;
   instructions?: string;
   score?: string;
-  urgency?: "high" | "normal";
+  urgency?: "high" | "normal" | string;
   feedback?: string;
   submittedAt?: string;
   submissionNotes?: string;
   attachedFileName?: string;
+  [key: string]: any;
+}
+
+export interface Course {
+  id: string;
+  code: string;
+  title: string;
+  level?: string;
+  description?: string;
+  category?: string;
+  prerequisites?: string[];
+  syllabus?: string[];
+  duration?: string;
+  instructor?: string;
+  schedule?: string;
+  image?: string;
+  featured?: boolean;
+  [key: string]: any;
+}
+
+export interface AcademicTrack {
+  id: string;
+  name: string;
+  code?: string;
+  description?: string;
+  courses?: Course[] | string[];
+  [key: string]: any;
+}
+
+export interface FacultyMember {
+  id: string;
+  name: string;
+  role: string;
+  bio?: string;
+  department?: string;
+  subjects?: string[];
+  image?: string;
+  email?: string;
+  qualifications?: string[];
+  [key: string]: any;
+}
+
+export interface TimetableEntry {
+  id: string;
+  day: string;
+  time: string;
+  course: string;
+  teacher?: string;
+  room?: string;
+  topic?: string;
+  [key: string]: any;
 }
