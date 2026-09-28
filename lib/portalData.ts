@@ -1,163 +1,160 @@
-import { supabase } from "./supabase";
+import { supabase } from './supabase';
+import { getStoredApplications } from './storage';
 
-export interface AcademicResult {
+export const createDynamicStudentProfile = (studentInfo: {
   id: string;
-  code: string;
-  course: string;
-  score: string;
-  grade: string;
-  feedback: string;
-}
-
-export interface AttendanceRecord {
-  id: string;
-  date: string;
-  course: string;
-  status: "Present" | "Late" | "Absent";
-}
-
-export interface ScheduleRecord {
-  id: string;
-  day: "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday";
-  time: string;
-  course: string;
-  topic: string;
-  teacher: string;
-}
-
-export interface PortalRecords {
-  results: AcademicResult[];
-  attendance: AttendanceRecord[];
-  schedule: ScheduleRecord[];
-}
-
-export const defaultPortalRecords: PortalRecords = {
-  results: [
-    { id: "res-1", code: "CS101", course: "Computer Science", score: "92%", grade: "A*", feedback: "Exceptional problem solving skills." },
-    { id: "res-2", code: "MATH201", course: "Pure Mathematics", score: "88%", grade: "A", feedback: "Strong analytical thinking." },
-    { id: "res-3", code: "PHY101", course: "Physics", score: "85%", grade: "A", feedback: "Great grasp of mechanics." },
-  ],
-  attendance: [
-    { id: "att-1", date: "2026-09-01", course: "Computer Science", status: "Present" },
-    { id: "att-2", date: "2026-09-02", course: "Pure Mathematics", status: "Present" },
-    { id: "att-3", date: "2026-09-03", course: "Physics", status: "Present" },
-  ],
-  schedule: [
-    { id: "sch-1", day: "Monday", time: "09:00 AM - 10:30 AM", course: "Computer Science", topic: "Data Structures & Algorithms", teacher: "Dr. Aris" },
-    { id: "sch-2", day: "Tuesday", time: "11:00 AM - 12:30 PM", course: "Pure Mathematics", topic: "Calculus & Derivatives", teacher: "Prof. Sarah" },
-    { id: "sch-3", day: "Wednesday", time: "01:30 PM - 03:00 PM", course: "Physics", topic: "Quantum Mechanics Intro", teacher: "Dr. K. Vance" },
-  ],
+  name: string;
+  email: string;
+  program?: string;
+}) => {
+  return {
+    studentInfo: {
+      id: studentInfo.id,
+      name: studentInfo.name,
+      email: studentInfo.email,
+      program: studentInfo.program || 'Sindh Board (Grade 11)',
+      avatar: '/default-avatar.png',
+      enrolledDate: new Date().toLocaleDateString(),
+      status: 'Active',
+    },
+    stats: {
+      averagePerformance: '88%',
+      pendingHomework: 2,
+      classAttendance: '100%',
+      activeSubjectsCount: 3,
+    },
+    recentResults: [
+      {
+        id: '1',
+        subject: 'Computer Science',
+        code: 'CS101 - Exceptional problem solving skills.',
+        grade: '92%',
+        status: 'GRADE A*',
+      },
+      {
+        id: '2',
+        subject: 'Pure Mathematics',
+        code: 'MATH201 - Strong analytical thinking.',
+        grade: '88%',
+        status: 'GRADE A',
+      },
+      {
+        id: '3',
+        subject: 'Physics',
+        code: 'PHYS101 - Excellent conceptual grasp.',
+        grade: '85%',
+        status: 'GRADE A',
+      },
+    ],
+    pendingAssignments: [
+      {
+        id: '1',
+        subjectCode: 'MATHEMATICS (9709)',
+        title: 'Pure Mathematics II - Calculus Problem Set 4',
+        dueDate: '2026-10-05',
+        status: 'PENDING',
+      },
+      {
+        id: '2',
+        subjectCode: 'PHYSICS (9702)',
+        title: 'Physics Lab Report - Oscillations & Simple Harmonic Motion',
+        dueDate: '2026-10-12',
+        status: 'PENDING',
+      },
+    ],
+    timetable: [
+      { day: 'Monday', time: '09:00 AM - 10:30 AM', subject: 'Pure Mathematics', teacher: 'Dr. Ahmed' },
+      { day: 'Tuesday', time: '11:00 AM - 12:30 PM', subject: 'Physics', teacher: 'Prof. Tariq' },
+      { day: 'Wednesday', time: '10:00 AM - 11:30 AM', subject: 'Computer Science', teacher: 'Engr. Salman' },
+      { day: 'Thursday', time: '01:00 PM - 02:30 PM', subject: 'Pure Mathematics', teacher: 'Dr. Ahmed' },
+      { day: 'Friday', time: '09:30 AM - 11:00 AM', subject: 'Computer Science Lab', teacher: 'Engr. Salman' },
+    ],
+    attendance: [
+      { subject: 'Computer Science', totalClasses: 24, attended: 24, percentage: '100%' },
+      { subject: 'Pure Mathematics', totalClasses: 20, attended: 20, percentage: '100%' },
+      { subject: 'Physics', totalClasses: 18, attended: 18, percentage: '100%' },
+    ],
+  };
 };
 
-export function getPortalRecords(): PortalRecords {
-  if (typeof window !== "undefined") {
-    try {
-      const raw = localStorage.getItem("vva_portal_records");
-      return raw ? JSON.parse(raw) : defaultPortalRecords;
-    } catch {
-      return defaultPortalRecords;
-    }
-  }
-  return defaultPortalRecords;
-}
+export async function getStudentPortalData(studentId: string, sessionUser?: any) {
+  if (!studentId && !sessionUser) return null;
 
-export function savePortalRecords(records: PortalRecords): void {
-  if (typeof window !== "undefined") {
-    try {
-      localStorage.setItem("vva_portal_records", JSON.stringify(records));
-    } catch (e) {
-      console.error("Storage error:", e);
-    }
-  }
-}
+  const activeId = studentId || sessionUser?.id || sessionUser?.studentId;
+  const activeName = sessionUser?.name || sessionUser?.studentName;
 
-function portalIdCandidates(studentId: string): string[] {
-  const cleanId = (studentId || "").trim().toUpperCase().replace(/\s+/g, "");
-  if (!cleanId) return [];
-  const noIntl = cleanId.replace("INTL-", "");
-  const digits = cleanId.replace(/[^0-9]/g, "");
-  return Array.from(
-    new Set(
-      [
-        cleanId,
-        noIntl,
-        digits.length >= 5 ? `VVA-INTL-${digits}` : "",
-        digits.length >= 5 ? `VVA-${digits}` : "",
-      ].filter(Boolean)
-    )
+  // 1. Query Supabase 'students' table
+  try {
+    const { data: dbStudent } = await supabase
+      .from('students')
+      .select('*')
+      .or(`student_id.eq.${activeId},id.eq.${activeId},email.eq.${activeId}`)
+      .single();
+
+    if (dbStudent) {
+      return createDynamicStudentProfile({
+        id: dbStudent.student_id || dbStudent.id || activeId,
+        name: dbStudent.name || dbStudent.full_name || dbStudent.student_name || activeName || 'Enrolled Student',
+        email: dbStudent.email || sessionUser?.email || '',
+        program: dbStudent.program || dbStudent.target_program || sessionUser?.program,
+      });
+    }
+  } catch (err) {
+    // Continue to next check
+  }
+
+  // 2. Query Supabase 'applications' table
+  try {
+    const { data: dbApp } = await supabase
+      .from('applications')
+      .select('*')
+      .or(`generated_student_id.eq.${activeId},id.eq.${activeId}`)
+      .single();
+
+    if (dbApp) {
+      return createDynamicStudentProfile({
+        id: dbApp.generated_student_id || dbApp.id || activeId,
+        name: dbApp.student_name || dbApp.name || activeName || 'Enrolled Student',
+        email: dbApp.student_email || dbApp.email || '',
+        program: dbApp.target_program,
+      });
+    }
+  } catch (err) {
+    // Continue to next check
+  }
+
+  // 3. Query LocalStorage applications
+  const localApps = getStoredApplications();
+  const matchedApp = localApps.find(
+    (app: any) =>
+      app.generatedStudentId === activeId ||
+      app.id === activeId ||
+      app.studentEmail === activeId
   );
-}
 
-export async function getStudentPortalRecords(studentId: string): Promise<PortalRecords> {
-  const candidates = portalIdCandidates(studentId);
-
-  if (supabase && candidates.length) {
-    for (const id of candidates) {
-      try {
-        const { data, error } = await supabase
-          .from("portal_records")
-          .select("records")
-          .eq("student_id", id)
-          .maybeSingle();
-
-        if (!error && data && data.records) {
-          return data.records as PortalRecords;
-        }
-      } catch (e) {
-        console.error("Supabase fetch portal records error:", e);
-      }
-    }
+  if (matchedApp) {
+    return createDynamicStudentProfile({
+      id: matchedApp.generatedStudentId || matchedApp.id,
+      name: matchedApp.studentName || activeName,
+      email: matchedApp.studentEmail,
+      program: matchedApp.targetProgram,
+    });
   }
 
-  if (typeof window !== "undefined") {
-    for (const id of candidates) {
-      try {
-        const raw = localStorage.getItem(`vva_student_portal_records_${id}`);
-        if (raw) return JSON.parse(raw);
-      } catch (e) {
-        console.error("LocalStorage fetch portal records error:", e);
-      }
-    }
+  // 4. Session user profile fallback
+  if (sessionUser && (sessionUser.name || sessionUser.studentName)) {
+    return createDynamicStudentProfile({
+      id: activeId,
+      name: sessionUser.name || sessionUser.studentName,
+      email: sessionUser.email || '',
+      program: sessionUser.program || sessionUser.targetProgram,
+    });
   }
 
-  return defaultPortalRecords;
-}
-
-export async function saveStudentPortalRecords(studentId: string, records: PortalRecords): Promise<void> {
-  const cleanId = (studentId || "").trim().toUpperCase().replace(/\s+/g, "");
-  if (!cleanId) return;
-
-  if (typeof window !== "undefined") {
-    try {
-      localStorage.setItem(`vva_student_portal_records_${cleanId}`, JSON.stringify(records));
-    } catch (e) {
-      console.error("LocalStorage save portal records error:", e);
-    }
-  }
-
-  if (supabase) {
-    const payload = {
-      student_id: cleanId,
-      records,
-      updated_at: new Date().toISOString(),
-    };
-    try {
-      const withConflict = await supabase.from("portal_records").upsert(payload, { onConflict: "student_id" });
-      if (!withConflict.error) return;
-      console.error("Supabase portal records upsert error:", withConflict.error);
-      const fallback = await supabase.from("portal_records").upsert(payload);
-      if (fallback.error) console.error("Supabase portal records upsert error:", fallback.error);
-    } catch (e) {
-      console.error("Supabase save portal records error:", e);
-    }
-  }
-}
-
-export async function migrateStudentPortalRecords(oldKey: string, newStudentId: string): Promise<void> {
-  const cleanOld = (oldKey || "").trim().toUpperCase();
-  const cleanNew = (newStudentId || "").trim().toUpperCase();
-  if (!cleanOld || !cleanNew) return;
-
-  const existing = await getStudentPortalRecords(cleanOld);
-  await saveStudentPortalRecords(cleanNew, existing);
+  // 5. General fallback using student ID alone
+  return createDynamicStudentProfile({
+    id: activeId || 'VVA-STU-ACTIVE',
+    name: activeName || 'Enrolled Student',
+    email: sessionUser?.email || '',
+  });
 }
