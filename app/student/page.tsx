@@ -10,13 +10,11 @@ import {
   CheckCircle2,
   CalendarDays,
   Clock,
-  User,
   LogOut,
   BarChart3,
   Award,
   Upload,
   Check,
-  AlertCircle,
   Sparkles,
   Send,
   MessageSquare,
@@ -39,31 +37,35 @@ const defaultAssignments: Assignment[] = [
     id: "asg-1",
     title: "Pure Mathematics II - Calculus Problem Set 4",
     course: "Mathematics (9709)",
+    courseCode: "9709",
     dueDate: "2026-10-05",
-    status: "Pending",
-    description: "Solve questions 1 through 12 on integration by parts and differential equations from Chapter 5.",
-    totalPoints: "100",
+    status: "pending",
+    instructions: "Solve questions 1 through 12 on integration by parts and differential equations from Chapter 5.",
+    score: "100 pts",
+    urgency: "high",
   },
   {
     id: "asg-2",
     title: "Physics Lab Report - Oscillations & Simple Harmonic Motion",
     course: "Physics (9702)",
+    courseCode: "9702",
     dueDate: "2026-10-08",
-    status: "Pending",
-    description: "Submit a complete 3-page lab report including uncertainty calculations, pendulum diagrams, and conclusion.",
-    totalPoints: "50",
+    status: "pending",
+    instructions: "Submit a complete 3-page lab report including uncertainty calculations, pendulum diagrams, and conclusion.",
+    score: "50 pts",
+    urgency: "normal",
   },
   {
     id: "asg-3",
     title: "Computer Science - Recursion & Binary Search Trees Essay",
     course: "Computer Science (9618)",
+    courseCode: "9618",
     dueDate: "2026-09-25",
-    status: "Graded",
-    description: "Compare time complexities of BST operations vs linear arrays with Python code snippets.",
-    submissionText: "Submitted implementation along with Big-O complexity graph comparison.",
-    totalPoints: "100",
-    earnedPoints: "94",
+    status: "graded",
+    instructions: "Compare time complexities of BST operations vs linear arrays with Python code snippets.",
+    score: "94 / 100",
     feedback: "Excellent analysis on tree balance factors and memory allocation!",
+    urgency: "normal",
   },
 ];
 
@@ -79,11 +81,11 @@ export default function StudentPortalPage() {
   });
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
+  const [submittedTexts, setSubmittedTexts] = useState<Record<string, string>>({});
   const [submissionInput, setSubmissionInput] = useState("");
   const [fileName, setFileName] = useState("");
   const [submitMessage, setSubmitMessage] = useState("");
 
-  // Load student session & portal data on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
       const isAuth = window.sessionStorage.getItem("vva_student_authenticated");
@@ -91,7 +93,6 @@ export default function StudentPortalPage() {
       const activeId = window.sessionStorage.getItem("vva_active_student_id");
 
       if (!isAuth && !rawAccount) {
-        // Fallback to login if unauthenticated
         router.push("/login");
         return;
       }
@@ -119,8 +120,8 @@ export default function StudentPortalPage() {
     }
   }, [router]);
 
-  const loadPortalRecords = (id: string) => {
-    const liveData = getStudentPortalRecords(id);
+  const loadPortalRecords = async (id: string) => {
+    const liveData = await getStudentPortalRecords(id);
     setRecords(liveData);
   };
 
@@ -146,12 +147,18 @@ export default function StudentPortalPage() {
     e.preventDefault();
     if (!selectedAssignment) return;
 
+    const textSubmitted = submissionInput || "File uploaded: " + (fileName || "document.pdf");
+
+    setSubmittedTexts((prev) => ({
+      ...prev,
+      [selectedAssignment.id]: textSubmitted,
+    }));
+
     const updated: Assignment[] = assignments.map((asg) => {
       if (asg.id === selectedAssignment.id) {
         return {
           ...asg,
-          status: "Submitted",
-          submissionText: submissionInput || "File uploaded: " + (fileName || "document.pdf"),
+          status: "submitted" as const,
         };
       }
       return asg;
@@ -160,8 +167,7 @@ export default function StudentPortalPage() {
     setAssignments(updated);
     setSelectedAssignment({
       ...selectedAssignment,
-      status: "Submitted",
-      submissionText: submissionInput || "File uploaded: " + (fileName || "document.pdf"),
+      status: "submitted",
     });
 
     await saveStudentAssignments(studentId, updated);
@@ -171,7 +177,6 @@ export default function StudentPortalPage() {
     setTimeout(() => setSubmitMessage(""), 3500);
   };
 
-  // Calculations for stats
   const totalResults = records.results.length;
   const avgScore = totalResults
     ? Math.round(
@@ -190,11 +195,10 @@ export default function StudentPortalPage() {
     ? Math.round((presentCount / totalAttendance) * 100)
     : 95;
 
-  const pendingAssignments = assignments.filter((a) => a.status === "Pending").length;
+  const pendingAssignments = assignments.filter((a) => a.status === "pending").length;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* Portal Header */}
       <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-50 px-4 sm:px-8 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3 group">
@@ -237,9 +241,7 @@ export default function StudentPortalPage() {
         </div>
       </header>
 
-      {/* Main Student Hub Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-8 space-y-8">
-        {/* Welcome Banner */}
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-900/60 via-slate-900 to-indigo-950 border border-indigo-500/30 p-6 sm:p-8 shadow-2xl">
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-2">
@@ -277,7 +279,6 @@ export default function StudentPortalPage() {
           <div className="absolute -right-12 -bottom-12 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
         </div>
 
-        {/* Navigation Tabs */}
         <nav className="flex items-center gap-2 border-b border-slate-800 pb-3 overflow-x-auto">
           {[
             { key: "overview", label: "Dashboard Overview", icon: BarChart3 },
@@ -310,10 +311,8 @@ export default function StudentPortalPage() {
           })}
         </nav>
 
-        {/* TAB 1: OVERVIEW */}
         {tab === "overview" && (
           <div className="space-y-8">
-            {/* Metric Summary Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
               <div
                 onClick={() => setTab("grades")}
@@ -376,9 +375,7 @@ export default function StudentPortalPage() {
               </div>
             </div>
 
-            {/* Two-Column Grid: Latest Results + Active Assignments */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Recent Grades */}
               <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                   <div className="flex items-center gap-2">
@@ -422,7 +419,6 @@ export default function StudentPortalPage() {
                 </div>
               </div>
 
-              {/* Action Required: Assignments */}
               <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                   <div className="flex items-center gap-2">
@@ -460,10 +456,10 @@ export default function StudentPortalPage() {
                       </div>
 
                       <span
-                        className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full shrink-0 ${
-                          asg.status === "Graded"
+                        className={`text-[10px] uppercase font-extrabold px-2.5 py-1 rounded-full shrink-0 ${
+                          asg.status === "graded"
                             ? "bg-emerald-950 text-emerald-300 border border-emerald-800/50"
-                            : asg.status === "Submitted"
+                            : asg.status === "submitted"
                             ? "bg-blue-950 text-blue-300 border border-blue-800/50"
                             : "bg-amber-950 text-amber-300 border border-amber-800/50"
                         }`}
@@ -478,7 +474,6 @@ export default function StudentPortalPage() {
           </div>
         )}
 
-        {/* TAB 2: ASSIGNMENTS HUB */}
         {tab === "assignments" && (
           <div className="space-y-6">
             {submitMessage && (
@@ -489,7 +484,6 @@ export default function StudentPortalPage() {
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Left Column: Assignment List */}
               <div className="lg:col-span-5 space-y-3">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
                   Assigned Homework ({assignments.length})
@@ -513,10 +507,10 @@ export default function StudentPortalPage() {
                             {asg.course}
                           </span>
                           <span
-                            className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${
-                              asg.status === "Graded"
+                            className={`text-[10px] uppercase font-extrabold px-2 py-0.5 rounded ${
+                              asg.status === "graded"
                                 ? "bg-emerald-950 text-emerald-300 border border-emerald-800/50"
-                                : asg.status === "Submitted"
+                                : asg.status === "submitted"
                                 ? "bg-blue-950 text-blue-300 border border-blue-800/50"
                                 : "bg-amber-950 text-amber-300 border border-amber-800/50"
                             }`}
@@ -534,7 +528,7 @@ export default function StudentPortalPage() {
                             <Clock className="w-3.5 h-3.5 text-slate-500" /> Due {asg.dueDate}
                           </span>
                           <span className="font-semibold text-slate-300">
-                            {asg.earnedPoints ? `${asg.earnedPoints} / ${asg.totalPoints} pts` : `${asg.totalPoints} pts`}
+                            {asg.score || "100 pts"}
                           </span>
                         </div>
                       </div>
@@ -543,7 +537,6 @@ export default function StudentPortalPage() {
                 </div>
               </div>
 
-              {/* Right Column: Submission Details & Interactive Upload */}
               <div className="lg:col-span-7">
                 {selectedAssignment ? (
                   <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6">
@@ -553,7 +546,7 @@ export default function StudentPortalPage() {
                           {selectedAssignment.course}
                         </span>
                         <span className="text-xs text-slate-400">
-                          Total Score: <strong>{selectedAssignment.totalPoints} Points</strong>
+                          Score / Weight: <strong>{selectedAssignment.score || "100 pts"}</strong>
                         </span>
                       </div>
                       <h2 className="text-xl font-extrabold text-white mt-1">
@@ -569,19 +562,18 @@ export default function StudentPortalPage() {
                         Teacher Instructions
                       </h4>
                       <p className="text-xs text-slate-300 leading-relaxed">
-                        {selectedAssignment.description}
+                        {selectedAssignment.instructions}
                       </p>
                     </div>
 
-                    {/* Graded Review State */}
-                    {selectedAssignment.status === "Graded" && (
+                    {selectedAssignment.status === "graded" && (
                       <div className="p-5 rounded-2xl bg-emerald-950/30 border border-emerald-500/30 space-y-3">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
                             <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Graded by Teacher
                           </span>
                           <strong className="text-sm text-emerald-300">
-                            Score: {selectedAssignment.earnedPoints} / {selectedAssignment.totalPoints}
+                            Score: {selectedAssignment.score || "Pass"}
                           </strong>
                         </div>
                         {selectedAssignment.feedback && (
@@ -593,14 +585,13 @@ export default function StudentPortalPage() {
                       </div>
                     )}
 
-                    {/* Submitted Review State */}
-                    {selectedAssignment.status === "Submitted" && (
+                    {selectedAssignment.status === "submitted" && (
                       <div className="p-5 rounded-2xl bg-blue-950/30 border border-blue-500/30 space-y-2">
                         <span className="text-xs font-bold text-blue-300 uppercase tracking-wider flex items-center gap-1.5">
                           <Check className="w-4 h-4 text-blue-400" /> Work Turned In
                         </span>
                         <p className="text-xs text-slate-300">
-                          {selectedAssignment.submissionText}
+                          {submittedTexts[selectedAssignment.id] || "Your assignment has been submitted successfully."}
                         </p>
                         <p className="text-[11px] text-slate-400 pt-2 border-t border-blue-900/50">
                           Your submission is pending evaluation by the teacher.
@@ -608,8 +599,7 @@ export default function StudentPortalPage() {
                       </div>
                     )}
 
-                    {/* Pending Submission Form */}
-                    {selectedAssignment.status === "Pending" && (
+                    {selectedAssignment.status === "pending" && (
                       <form onSubmit={handleSubmitAssignment} className="space-y-4 pt-4 border-t border-slate-800">
                         <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
                           <Send className="w-4 h-4 text-indigo-400" /> Submit Student Homework
@@ -677,7 +667,6 @@ export default function StudentPortalPage() {
           </div>
         )}
 
-        {/* TAB 3: GRADES & ACADEMIC RESULTS */}
         {tab === "grades" && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
@@ -736,7 +725,6 @@ export default function StudentPortalPage() {
           </div>
         )}
 
-        {/* TAB 4: CLASS TIMETABLE */}
         {tab === "timetable" && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6">
             <div>
@@ -782,7 +770,6 @@ export default function StudentPortalPage() {
           </div>
         )}
 
-        {/* TAB 5: ATTENDANCE LOG */}
         {tab === "attendance" && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
