@@ -1,35 +1,50 @@
 import { supabase } from './supabase';
 import { getSavedApplications } from './storage';
 
-// Interfaces required by app/owner/page.tsx and app/student/page.tsx
+// Flexible interfaces required by app/owner/page.tsx and app/student/page.tsx
 export interface AcademicResult {
-  id: string;
-  subject: string;
-  code: string;
-  grade: string;
-  status: string;
+  id?: string;
+  subject?: string;
+  code?: string;
+  course?: string;
+  score?: string;
+  grade?: string;
+  status?: string;
+  feedback?: string;
+  [key: string]: any;
 }
 
 export interface AttendanceRecord {
-  subject: string;
-  totalClasses: number;
-  attended: number;
-  percentage: string;
+  id?: string;
+  subject?: string;
+  course?: string;
+  date?: string;
+  totalClasses?: number;
+  attended?: number;
+  percentage?: string;
+  status?: string;
+  [key: string]: any;
 }
 
 export interface ScheduleRecord {
-  day: string;
-  time: string;
-  subject: string;
-  teacher: string;
+  id?: string;
+  day?: string;
+  time?: string;
+  subject?: string;
+  course?: string;
+  teacher?: string;
+  room?: string;
+  [key: string]: any;
 }
 
 export interface AssignmentRecord {
-  id: string;
-  subjectCode: string;
-  title: string;
-  dueDate: string;
-  status: string;
+  id?: string;
+  subjectCode?: string;
+  subject?: string;
+  title?: string;
+  dueDate?: string;
+  status?: string;
+  [key: string]: any;
 }
 
 export interface StudentInfoRecord {
@@ -40,6 +55,7 @@ export interface StudentInfoRecord {
   avatar?: string;
   enrolledDate?: string;
   status?: string;
+  [key: string]: any;
 }
 
 export interface StatsRecord {
@@ -47,15 +63,20 @@ export interface StatsRecord {
   pendingHomework: number;
   classAttendance: string;
   activeSubjectsCount: number;
+  [key: string]: any;
 }
 
 export interface PortalRecords {
-  studentInfo: StudentInfoRecord;
-  stats: StatsRecord;
-  recentResults: AcademicResult[];
-  pendingAssignments: AssignmentRecord[];
-  timetable: ScheduleRecord[];
-  attendance: AttendanceRecord[];
+  studentInfo?: StudentInfoRecord | any;
+  stats?: StatsRecord | any;
+  recentResults?: AcademicResult[];
+  results?: AcademicResult[];
+  pendingAssignments?: AssignmentRecord[];
+  assignments?: AssignmentRecord[];
+  timetable?: ScheduleRecord[];
+  schedule?: ScheduleRecord[];
+  attendance?: AttendanceRecord[];
+  [key: string]: any;
 }
 
 // Dynamic Profile Generator (Uses student's real name, email, program, ID)
@@ -65,6 +86,72 @@ export const createDynamicStudentProfile = (studentInfo: {
   email: string;
   program?: string;
 }): PortalRecords => {
+  const defaultResults: AcademicResult[] = [
+    {
+      id: '1',
+      subject: 'Computer Science',
+      code: 'CS101',
+      course: 'Computer Science',
+      score: '92',
+      grade: '92%',
+      status: 'GRADE A*',
+      feedback: 'Exceptional problem solving skills.',
+    },
+    {
+      id: '2',
+      subject: 'Pure Mathematics',
+      code: 'MATH201',
+      course: 'Pure Mathematics',
+      score: '88',
+      grade: '88%',
+      status: 'GRADE A',
+      feedback: 'Strong analytical thinking.',
+    },
+    {
+      id: '3',
+      subject: 'Physics',
+      code: 'PHYS101',
+      course: 'Physics',
+      score: '85',
+      grade: '85%',
+      status: 'GRADE A',
+      feedback: 'Excellent conceptual grasp.',
+    },
+  ];
+
+  const defaultAssignments: AssignmentRecord[] = [
+    {
+      id: '1',
+      subjectCode: 'MATHEMATICS (9709)',
+      subject: 'Mathematics',
+      title: 'Pure Mathematics II - Calculus Problem Set 4',
+      dueDate: '2026-10-05',
+      status: 'PENDING',
+    },
+    {
+      id: '2',
+      subjectCode: 'PHYSICS (9702)',
+      subject: 'Physics',
+      title: 'Physics Lab Report - Oscillations & Simple Harmonic Motion',
+      dueDate: '2026-10-12',
+      status: 'PENDING',
+    },
+  ];
+
+  const defaultSchedule: ScheduleRecord[] = [
+    { id: '1', day: 'Monday', time: '09:00 AM - 10:30 AM', subject: 'Pure Mathematics', course: 'Pure Mathematics', teacher: 'Dr. Ahmed' },
+    { id: '2', day: 'Tuesday', time: '11:00 AM - 12:30 PM', subject: 'Physics', course: 'Physics', teacher: 'Prof. Tariq' },
+    { id: '3', day: 'Wednesday', time: '10:00 AM - 11:30 AM', subject: 'Computer Science', course: 'Computer Science', teacher: 'Engr. Salman' },
+    { id: '4', day: 'Thursday', time: '01:00 PM - 02:30 PM', subject: 'Pure Mathematics', course: 'Pure Mathematics', teacher: 'Dr. Ahmed' },
+    { id: '5', day: 'Friday', time: '09:30 AM - 11:00 AM', subject: 'Computer Science Lab', course: 'Computer Science Lab', teacher: 'Engr. Salman' },
+  ];
+
+  const defaultAttendance: AttendanceRecord[] = [
+    { id: '1', subject: 'Computer Science', course: 'Computer Science', date: '2026-09-28', totalClasses: 24, attended: 24, percentage: '100%', status: 'Present' },
+    { id: '2', subject: 'Pure Mathematics', course: 'Pure Mathematics', date: '2026-09-28', totalClasses: 20, attended: 20, percentage: '100%', status: 'Present' },
+    { id: '3', subject: 'Physics', course: 'Physics', date: '2026-09-28', totalClasses: 18, attended: 18, percentage: '100%', status: 'Present' },
+  ];
+
   return {
     studentInfo: {
       id: studentInfo.id,
@@ -81,64 +168,20 @@ export const createDynamicStudentProfile = (studentInfo: {
       classAttendance: '100%',
       activeSubjectsCount: 3,
     },
-    recentResults: [
-      {
-        id: '1',
-        subject: 'Computer Science',
-        code: 'CS101 - Exceptional problem solving skills.',
-        grade: '92%',
-        status: 'GRADE A*',
-      },
-      {
-        id: '2',
-        subject: 'Pure Mathematics',
-        code: 'MATH201 - Strong analytical thinking.',
-        grade: '88%',
-        status: 'GRADE A',
-      },
-      {
-        id: '3',
-        subject: 'Physics',
-        code: 'PHYS101 - Excellent conceptual grasp.',
-        grade: '85%',
-        status: 'GRADE A',
-      },
-    ],
-    pendingAssignments: [
-      {
-        id: '1',
-        subjectCode: 'MATHEMATICS (9709)',
-        title: 'Pure Mathematics II - Calculus Problem Set 4',
-        dueDate: '2026-10-05',
-        status: 'PENDING',
-      },
-      {
-        id: '2',
-        subjectCode: 'PHYSICS (9702)',
-        title: 'Physics Lab Report - Oscillations & Simple Harmonic Motion',
-        dueDate: '2026-10-12',
-        status: 'PENDING',
-      },
-    ],
-    timetable: [
-      { day: 'Monday', time: '09:00 AM - 10:30 AM', subject: 'Pure Mathematics', teacher: 'Dr. Ahmed' },
-      { day: 'Tuesday', time: '11:00 AM - 12:30 PM', subject: 'Physics', teacher: 'Prof. Tariq' },
-      { day: 'Wednesday', time: '10:00 AM - 11:30 AM', subject: 'Computer Science', teacher: 'Engr. Salman' },
-      { day: 'Thursday', time: '01:00 PM - 02:30 PM', subject: 'Pure Mathematics', teacher: 'Dr. Ahmed' },
-      { day: 'Friday', time: '09:30 AM - 11:00 AM', subject: 'Computer Science Lab', teacher: 'Engr. Salman' },
-    ],
-    attendance: [
-      { subject: 'Computer Science', totalClasses: 24, attended: 24, percentage: '100%' },
-      { subject: 'Pure Mathematics', totalClasses: 20, attended: 20, percentage: '100%' },
-      { subject: 'Physics', totalClasses: 18, attended: 18, percentage: '100%' },
-    ],
+    recentResults: defaultResults,
+    results: defaultResults,
+    pendingAssignments: defaultAssignments,
+    assignments: defaultAssignments,
+    timetable: defaultSchedule,
+    schedule: defaultSchedule,
+    attendance: defaultAttendance,
   };
 };
 
-// Functions required by app/owner/page.tsx
 const PORTAL_STORAGE_KEY = 'vva_portal_records_db';
 
-export function getPortalRecords(): Record<string, PortalRecords> {
+// Multi-argument compatible storage helpers for app/owner/page.tsx
+export function getPortalRecords(studentId?: string, extra?: any): Record<string, PortalRecords> {
   if (typeof window === 'undefined') return {};
   try {
     const data = localStorage.getItem(PORTAL_STORAGE_KEY);
@@ -149,27 +192,36 @@ export function getPortalRecords(): Record<string, PortalRecords> {
   }
 }
 
-export function savePortalRecords(records: Record<string, PortalRecords>): void {
+export function savePortalRecords(records?: any, extra?: any): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(PORTAL_STORAGE_KEY, JSON.stringify(records));
+    if (records) {
+      localStorage.setItem(PORTAL_STORAGE_KEY, JSON.stringify(records));
+    }
   } catch (err) {
     console.error('Error saving portal records:', err);
   }
 }
 
-export function getStudentPortalRecords(studentId: string): PortalRecords | null {
+export function getStudentPortalRecords(studentId: string, extra?: any): PortalRecords {
   const allRecords = getPortalRecords();
-  return allRecords[studentId] || null;
+  if (allRecords[studentId]) {
+    return allRecords[studentId];
+  }
+  return createDynamicStudentProfile({
+    id: studentId || 'VVA-STU',
+    name: 'Enrolled Student',
+    email: '',
+  });
 }
 
-export function saveStudentPortalRecords(studentId: string, records: PortalRecords): void {
+export function saveStudentPortalRecords(studentId: string, records: PortalRecords, extra?: any): void {
   const allRecords = getPortalRecords();
   allRecords[studentId] = records;
   savePortalRecords(allRecords);
 }
 
-export function migrateStudentPortalRecords(studentId?: string): Record<string, PortalRecords> {
+export function migrateStudentPortalRecords(studentId?: string, extra?: any): Record<string, PortalRecords> {
   const allRecords = getPortalRecords();
   if (studentId && !allRecords[studentId]) {
     allRecords[studentId] = createDynamicStudentProfile({
@@ -182,20 +234,19 @@ export function migrateStudentPortalRecords(studentId?: string): Record<string, 
   return allRecords;
 }
 
-// Main loader used by app/student/page.tsx
-export async function getStudentPortalData(studentId: string, sessionUser?: any): Promise<PortalRecords | null> {
-  if (!studentId && !sessionUser) return null;
-
-  const activeId = studentId || sessionUser?.id || sessionUser?.studentId;
+// Primary portal data query function
+export async function getStudentPortalData(studentId: string, sessionUser?: any): Promise<PortalRecords> {
+  const activeId = studentId || sessionUser?.id || sessionUser?.studentId || 'VVA-STU';
   const activeName = sessionUser?.name || sessionUser?.studentName;
 
-  // 1. Check local saved portal records (e.g. owner portal edits)
-  const savedRecord = getStudentPortalRecords(activeId);
-  if (savedRecord) {
-    if (activeName && savedRecord.studentInfo) {
-      savedRecord.studentInfo.name = activeName;
+  // 1. Check local saved portal records
+  const allSaved = getPortalRecords();
+  if (allSaved[activeId]) {
+    const saved = allSaved[activeId];
+    if (activeName && saved.studentInfo) {
+      saved.studentInfo.name = activeName;
     }
-    return savedRecord;
+    return saved;
   }
 
   // 2. Query Supabase 'students' table
@@ -242,7 +293,7 @@ export async function getStudentPortalData(studentId: string, sessionUser?: any)
     // Continue
   }
 
-  // 4. Query LocalStorage applications via getSavedApplications
+  // 4. Query LocalStorage applications
   try {
     const localApps = getSavedApplications();
     if (Array.isArray(localApps)) {
@@ -268,7 +319,7 @@ export async function getStudentPortalData(studentId: string, sessionUser?: any)
     // Continue
   }
 
-  // 5. Active session user profile fallback
+  // 5. Session user fallback
   if (sessionUser && (sessionUser.name || sessionUser.studentName)) {
     const profile = createDynamicStudentProfile({
       id: activeId,
@@ -280,9 +331,9 @@ export async function getStudentPortalData(studentId: string, sessionUser?: any)
     return profile;
   }
 
-  // 6. Fallback using student ID
+  // 6. Generic fallback
   const profile = createDynamicStudentProfile({
-    id: activeId || 'VVA-STU-ACTIVE',
+    id: activeId,
     name: activeName || 'Enrolled Student',
     email: sessionUser?.email || '',
   });
