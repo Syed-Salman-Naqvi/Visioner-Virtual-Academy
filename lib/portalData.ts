@@ -2,55 +2,55 @@ import { supabase } from './supabase';
 import { getSavedApplications } from './storage';
 
 export interface AcademicResult {
-  id: string;
-  subject: string;
-  code: string;
-  course: string;
-  score: string;
-  grade: string;
-  status: string;
-  feedback: string;
+  id?: string;
+  subject?: string;
+  code?: string;
+  course?: string;
+  score?: string;
+  grade?: string;
+  status?: string;
+  feedback?: string;
   [key: string]: any;
 }
 
 export interface AttendanceRecord {
-  id: string;
-  subject: string;
-  course: string;
-  date: string;
-  totalClasses: number;
-  attended: number;
-  percentage: string;
-  status: string;
+  id?: string;
+  subject?: string;
+  course?: string;
+  date?: string;
+  totalClasses?: number;
+  attended?: number;
+  percentage?: string;
+  status?: string;
   [key: string]: any;
 }
 
 export interface ScheduleRecord {
-  id: string;
-  day: string;
-  time: string;
-  subject: string;
-  course: string;
-  teacher: string;
+  id?: string;
+  day?: string;
+  time?: string;
+  subject?: string;
+  course?: string;
+  teacher?: string;
   room?: string;
   [key: string]: any;
 }
 
 export interface AssignmentRecord {
-  id: string;
-  subjectCode: string;
-  subject: string;
-  title: string;
-  dueDate: string;
-  status: string;
+  id?: string;
+  subjectCode?: string;
+  subject?: string;
+  title?: string;
+  dueDate?: string;
+  status?: string;
   [key: string]: any;
 }
 
 export interface StudentInfoRecord {
-  id: string;
-  name: string;
-  email: string;
-  program: string;
+  id?: string;
+  name?: string;
+  email?: string;
+  program?: string;
   avatar?: string;
   enrolledDate?: string;
   status?: string;
@@ -58,23 +58,23 @@ export interface StudentInfoRecord {
 }
 
 export interface StatsRecord {
-  averagePerformance: string;
-  pendingHomework: number;
-  classAttendance: string;
-  activeSubjectsCount: number;
+  averagePerformance?: string;
+  pendingHomework?: number;
+  classAttendance?: string;
+  activeSubjectsCount?: number;
   [key: string]: any;
 }
 
 export interface PortalRecords {
-  studentInfo: StudentInfoRecord;
-  stats: StatsRecord;
-  recentResults: AcademicResult[];
-  results: AcademicResult[];
-  pendingAssignments: AssignmentRecord[];
-  assignments: AssignmentRecord[];
-  timetable: ScheduleRecord[];
-  schedule: ScheduleRecord[];
-  attendance: AttendanceRecord[];
+  studentInfo?: StudentInfoRecord;
+  stats?: StatsRecord;
+  recentResults?: AcademicResult[];
+  results?: AcademicResult[];
+  pendingAssignments?: AssignmentRecord[];
+  assignments?: AssignmentRecord[];
+  timetable?: ScheduleRecord[];
+  schedule?: ScheduleRecord[];
+  attendance?: AttendanceRecord[];
   [key: string]: any;
 }
 
@@ -178,15 +178,23 @@ export const createDynamicStudentProfile = (studentInfo: {
 
 const PORTAL_STORAGE_KEY = 'vva_portal_records_db';
 
-export function getPortalRecords(studentId?: string, extra?: any): Record<string, PortalRecords> {
-  if (typeof window === 'undefined') return {};
+export function getPortalRecords(studentId?: string, extra?: any): PortalRecords {
+  if (typeof window === 'undefined') {
+    return createDynamicStudentProfile({ id: 'VVA-STU', name: 'Enrolled Student', email: '' });
+  }
   try {
     const data = localStorage.getItem(PORTAL_STORAGE_KEY);
-    return data ? JSON.parse(data) : {};
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (studentId && parsed[studentId]) {
+        return parsed[studentId];
+      }
+      return parsed;
+    }
   } catch (err) {
     console.error('Error reading portal records:', err);
-    return {};
   }
+  return createDynamicStudentProfile({ id: studentId || 'VVA-STU', name: 'Enrolled Student', email: '' });
 }
 
 export function savePortalRecords(records?: any, extra?: any): void {
@@ -202,7 +210,7 @@ export function savePortalRecords(records?: any, extra?: any): void {
 
 export function getStudentPortalRecords(studentId: string, extra?: any): PortalRecords {
   const allRecords = getPortalRecords();
-  if (allRecords[studentId]) {
+  if (allRecords && allRecords[studentId]) {
     const existing = allRecords[studentId];
     return {
       ...existing,
@@ -228,15 +236,17 @@ export function saveStudentPortalRecords(studentId: string, records: PortalRecor
   savePortalRecords(allRecords);
 }
 
-export function migrateStudentPortalRecords(studentId?: string, extra?: any): Record<string, PortalRecords> {
+export function migrateStudentPortalRecords(studentId?: string, extra?: any): PortalRecords {
   const allRecords = getPortalRecords();
   if (studentId && !allRecords[studentId]) {
-    allRecords[studentId] = createDynamicStudentProfile({
+    const newProfile = createDynamicStudentProfile({
       id: studentId,
       name: 'Enrolled Student',
       email: '',
     });
+    allRecords[studentId] = newProfile;
     savePortalRecords(allRecords);
+    return newProfile;
   }
   return allRecords;
 }
@@ -246,7 +256,7 @@ export async function getStudentPortalData(studentId: string, sessionUser?: any)
   const activeName = sessionUser?.name || sessionUser?.studentName;
 
   const allSaved = getPortalRecords();
-  if (allSaved[activeId]) {
+  if (allSaved && allSaved[activeId]) {
     const saved = allSaved[activeId];
     if (activeName && saved.studentInfo) {
       saved.studentInfo.name = activeName;
