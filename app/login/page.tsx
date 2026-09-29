@@ -3,7 +3,22 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { getSavedApplications, getSavedStudents } from '@/lib/storage';
+import { getSavedApplications } from '@/lib/storage';
+
+// Safe internal helper to retrieve locally saved student accounts
+const getSavedStudents = (): any[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw =
+      localStorage.getItem('vva_student_accounts') ||
+      localStorage.getItem('vva_students') ||
+      localStorage.getItem('vva_student_list');
+    return raw ? JSON.parse(raw) : [];
+  } catch (err) {
+    console.warn('Error reading saved students from localStorage:', err);
+    return [];
+  }
+};
 
 export default function LoginPage() {
   const router = useRouter();
@@ -240,7 +255,6 @@ export default function LoginPage() {
         localStorage.setItem('vva_session', JSON.stringify(authenticatedUser));
         localStorage.setItem('vva_role', authenticatedUser.role);
 
-        // Redirect based on role
         if (role === 'owner') {
           window.location.href = '/owner';
         } else if (role === 'parent') {
@@ -260,7 +274,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-[#060813] text-slate-100 flex items-center justify-center px-4 py-12 selection:bg-indigo-500 selection:text-white">
       <div className="w-full max-w-md bg-[#0b0f24]/90 border border-slate-800/80 rounded-2xl p-8 shadow-2xl backdrop-blur-xl">
-        {/* Header Logo & Title */}
         <div className="text-center mb-8">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center text-white font-black text-2xl mx-auto shadow-lg shadow-indigo-500/20 mb-3">
             V
@@ -269,7 +282,6 @@ export default function LoginPage() {
           <p className="text-xs text-slate-400 mt-1">Sign in to access your portal</p>
         </div>
 
-        {/* Role Selector Tabs */}
         <div className="grid grid-cols-3 gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800 mb-6">
           <button
             type="button"
@@ -300,7 +312,6 @@ export default function LoginPage() {
           </button>
         </div>
 
-        {/* Error Alert Box */}
         {error && (
           <div className="mb-6 p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-xs font-medium flex items-center space-x-2">
             <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -310,7 +321,6 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Login Form */}
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1.5">
@@ -356,7 +366,6 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Quick Credentials Info Box */}
         <div className="mt-6 pt-5 border-t border-slate-800/80 text-center">
           <p className="text-[11px] text-slate-500 leading-relaxed">
             New applicant? Submit an application via <a href="/admissions" className="text-indigo-400 hover:underline">Admissions</a> to receive generated portal access.
