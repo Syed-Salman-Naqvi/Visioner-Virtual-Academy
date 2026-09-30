@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { initializeDefaultAccounts } from "@/lib/seed-data";
 import { loginOwner, loginStudent, savePortalSession } from "@/lib/auth";
@@ -45,6 +47,14 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen bg-[#060813] text-slate-100 flex items-center justify-center px-4 py-12">
+      <Link
+        href="/"
+        className="fixed left-5 top-5 z-10 inline-flex items-center gap-2 rounded-xl border border-slate-800 bg-[#0b0f24]/95 px-4 py-2.5 text-sm font-semibold text-slate-300 shadow-lg backdrop-blur transition hover:border-indigo-500 hover:bg-slate-900 hover:text-white"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to Website
+      </Link>
+
       <section className="w-full max-w-md rounded-2xl border border-slate-800 bg-[#0b0f24]/95 p-8 shadow-2xl">
         <div className="text-center mb-8">
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-600 text-2xl font-black">V</div>
@@ -53,7 +63,7 @@ export default function LoginPage() {
         </div>
 
         <div className="mb-6 grid grid-cols-2 gap-1 rounded-xl border border-slate-800 bg-slate-900 p-1">
-          {(["student", "owner"] as const).map((item) => (
+          {["student", "owner"] as const}.map((item) => (
             <button key={item} type="button" onClick={() => { setRole(item); setError(""); }}
               className={`rounded-lg py-2.5 text-xs font-bold capitalize ${role === item ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-white"}`}>
               {item === "owner" ? "Teacher / Owner" : "Student"}
