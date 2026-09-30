@@ -1,172 +1,3 @@
-// import { supabase } from "./supabase";
-// import { AdmissionsApplication, StudentAccount, Assignment } from "./types";
-// import { mockApplications } from "./mockData";
-
-// export async function getSavedApplications(): Promise<AdmissionsApplication[]> {
-//   if (typeof window === "undefined") {
-//     return mockApplications;
-//   }
-//   try {
-//     const { data, error } = await supabase
-//       .from("applications")
-//       .select("*")
-//       .order("created_at", { ascending: false });
-
-//     if (error || !data || data.length === 0) {
-//       const raw = localStorage.getItem("vva_admissions_apps");
-//       return raw ? JSON.parse(raw) : mockApplications;
-//     }
-
-//     return data.map((item) => ({
-//       id: item.id,
-//       createdAt: item.created_at || item.createdAt || "2026-09-01",
-//       status: item.status || "Under Review",
-//       studentName: item.student_name || item.studentName || "Student",
-//       studentEmail: item.student_email || item.studentEmail || "",
-//       dateOfBirth: item.date_of_birth || item.dateOfBirth || "",
-//       nationality: item.nationality || "",
-//       countryOfResidence: item.country_of_residence || item.countryOfResidence || "",
-//       city: item.city || "",
-//       parentName: item.parent_name || item.parentName || "",
-//       parentEmail: item.parent_email || item.parentEmail || "",
-//       parentPhone: item.parent_phone || item.parentPhone || "",
-//       targetTrack: item.target_track || item.targetTrack || "",
-//       gradeLevel: item.grade_level || item.gradeLevel || "",
-//       timeZone: item.time_zone || item.timeZone || "",
-//       preferredCohortSlot: item.preferred_cohort_slot || item.preferredCohortSlot || "",
-//       assignedAdvisor: item.assigned_advisor || item.assignedAdvisor || "Admissions Office",
-//       documentsAttached: item.documents_attached || item.documentsAttached || [],
-//       statementOfPurpose: item.statement_of_purpose || item.statementOfPurpose || "",
-//     }));
-//   } catch {
-//     const raw = localStorage.getItem("vva_admissions_apps");
-//     return raw ? JSON.parse(raw) : mockApplications;
-//   }
-// }
-
-// export async function saveApplication(app: AdmissionsApplication): Promise<void> {
-//   if (typeof window !== "undefined") {
-//     try {
-//       const existing = localStorage.getItem("vva_admissions_apps");
-//       const list: AdmissionsApplication[] = existing ? JSON.parse(existing) : mockApplications;
-//       const next = [app, ...list.filter((i) => i.id !== app.id)];
-//       localStorage.setItem("vva_admissions_apps", JSON.stringify(next));
-//     } catch (e) {
-//       console.error("Local storage error:", e);
-//     }
-//   }
-
-//   try {
-//     await supabase.from("applications").upsert({
-//       id: app.id,
-//       created_at: app.createdAt,
-//       status: app.status,
-//       student_name: app.studentName,
-//       student_email: app.studentEmail,
-//       date_of_birth: app.dateOfBirth,
-//       nationality: app.nationality,
-//       country_of_residence: app.countryOfResidence,
-//       city: app.city,
-//       parent_name: app.parentName,
-//       parent_email: app.parentEmail,
-//       parent_phone: app.parentPhone,
-//       target_track: app.targetTrack,
-//       grade_level: app.gradeLevel,
-//       time_zone: app.timeZone,
-//       preferred_cohort_slot: app.preferredCohortSlot,
-//       assigned_advisor: app.assignedAdvisor,
-//       documents_attached: app.documentsAttached,
-//       statement_of_purpose: app.statementOfPurpose,
-//     });
-//   } catch (e) {
-//     console.error("Supabase Save Error:", e);
-//   }
-// }
-
-// export async function findApplicationById(id: string): Promise<AdmissionsApplication | null> {
-//   const apps = await getSavedApplications();
-//   return apps.find((item) => item.id.toUpperCase() === id.trim().toUpperCase()) || null;
-// }
-
-// export async function getStudentAccounts(): Promise<StudentAccount[]> {
-//   if (typeof window === "undefined") {
-//     return [];
-//   }
-//   try {
-//     const { data, error } = await supabase.from("student_accounts").select("*");
-//     if (error || !data) {
-//       const raw = localStorage.getItem("vva_student_accounts");
-//       return raw ? JSON.parse(raw) : [];
-//     }
-//     return data.map((item) => ({
-//       applicationId: item.application_id,
-//       studentId: item.student_id,
-//       password: item.password,
-//       studentName: item.student_name,
-//       studentEmail: item.student_email,
-//       createdAt: item.created_at,
-//     }));
-//   } catch {
-//     const raw = localStorage.getItem("vva_student_accounts");
-//     return raw ? JSON.parse(raw) : [];
-//   }
-// }
-
-// export async function saveStudentAccount(account: StudentAccount): Promise<void> {
-//   if (typeof window !== "undefined") {
-//     try {
-//       const raw = localStorage.getItem("vva_student_accounts");
-//       const list: StudentAccount[] = raw ? JSON.parse(raw) : [];
-//       const next = [account, ...list.filter((i) => i.applicationId !== account.applicationId)];
-//       localStorage.setItem("vva_student_accounts", JSON.stringify(next));
-//     } catch (e) {
-//       console.error("Local storage error:", e);
-//     }
-//   }
-
-//   try {
-//     await supabase.from("student_accounts").upsert({
-//       application_id: account.applicationId,
-//       student_id: account.studentId,
-//       password: account.password,
-//       student_name: account.studentName,
-//       student_email: account.studentEmail,
-//       created_at: account.createdAt,
-//     });
-//   } catch (e) {
-//     console.error("Supabase Save Error:", e);
-//   }
-// }
-
-// export async function getStudentAssignments(
-//   studentId: string,
-//   defaultList: Assignment[] = []
-// ): Promise<Assignment[]> {
-//   if (typeof window === "undefined") {
-//     return defaultList;
-//   }
-//   try {
-//     const raw = localStorage.getItem(`vva_assignments_${studentId}`);
-//     return raw ? JSON.parse(raw) : defaultList;
-//   } catch {
-//     return defaultList;
-//   }
-// }
-
-// export async function saveStudentAssignments(
-//   studentId: string,
-//   assignments: Assignment[]
-// ): Promise<void> {
-//   if (typeof window !== "undefined") {
-//     try {
-//       localStorage.setItem(`vva_assignments_${studentId}`, JSON.stringify(assignments));
-//     } catch (e) {
-//       console.error("Local storage error:", e);
-//     }
-//   }
-// }
-
-
 import { supabase } from "./supabase";
 import { AdmissionsApplication, StudentAccount, Assignment } from "./types";
 import { mockApplications } from "./mockData";
@@ -174,265 +5,84 @@ import { mockApplications } from "./mockData";
 export async function getSavedApplications(): Promise<AdmissionsApplication[]> {
   let localApps: AdmissionsApplication[] = [];
   if (typeof window !== "undefined") {
-    try {
-      const raw = localStorage.getItem("vva_admissions_apps");
-      if (raw) localApps = JSON.parse(raw);
-    } catch (e) {
-      console.error("LocalStorage fetch error:", e);
-    }
+    try { const raw = localStorage.getItem("vva_admissions_apps"); if (raw) localApps = JSON.parse(raw); } catch {}
   }
-
   let dbApps: AdmissionsApplication[] = [];
-  if (supabase) {
-    try {
-      const { data, error } = await supabase
-        .from("applications")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (!error && data && Array.isArray(data)) {
-        dbApps = data.map((item: any) => ({
-          id: item.id,
-          createdAt: item.created_at || item.createdAt || "2026-09-01",
-          status: item.status || "Under Review",
-          studentName: item.student_name || item.studentName || "Student",
-          studentEmail: item.student_email || item.studentEmail || "",
-          dateOfBirth: item.date_of_birth || item.dateOfBirth || "",
-          nationality: item.nationality || "",
-          countryOfResidence: item.country_of_residence || item.countryOfResidence || "",
-          city: item.city || "",
-          parentName: item.parent_name || item.parentName || "",
-          parentEmail: item.parent_email || item.parentEmail || "",
-          parentPhone: item.parent_phone || item.parentPhone || "",
-          targetTrack: item.target_track || item.targetTrack || "",
-          gradeLevel: item.grade_level || item.gradeLevel || "",
-          timeZone: item.time_zone || item.timeZone || "",
-          preferredCohortSlot: item.preferred_cohort_slot || item.preferredCohortSlot || "",
-          assignedAdvisor: item.assigned_advisor || item.assignedAdvisor || "Admissions Office",
-          documentsAttached: Array.isArray(item.documents_attached)
-            ? item.documents_attached
-            : Array.isArray(item.documentsAttached)
-            ? item.documentsAttached
-            : [],
-          statementOfPurpose: item.statement_of_purpose || item.statementOfPurpose || "",
-        }));
-      }
-    } catch (e) {
-      console.error("Supabase applications fetch error:", e);
-    }
-  }
-
-  const appMap = new Map<string, AdmissionsApplication>();
-  [...mockApplications, ...localApps, ...dbApps].forEach((app) => {
-    if (app && app.id) appMap.set(app.id.trim().toUpperCase(), app);
-  });
-
-  return Array.from(appMap.values());
+  try {
+    const { data } = await supabase.from("applications").select("*").order("created_at", { ascending: false });
+    if (data) dbApps = data.map((item: any) => ({
+      id: item.id, createdAt: item.created_at || item.createdAt || new Date().toISOString(), status: item.status || "Under Review",
+      studentName: item.student_name || item.studentName || "Student", studentEmail: item.student_email || item.studentEmail || "",
+      dateOfBirth: item.date_of_birth || item.dateOfBirth || "", nationality: item.nationality || "", countryOfResidence: item.country_of_residence || "",
+      city: item.city || "", parentName: item.parent_name || "", parentEmail: item.parent_email || "", parentPhone: item.parent_phone || "",
+      targetTrack: item.target_track || "", gradeLevel: item.grade_level || "", timeZone: item.time_zone || "",
+      preferredCohortSlot: item.preferred_cohort_slot || "", assignedAdvisor: item.assigned_advisor || "Admissions Office",
+      documentsAttached: Array.isArray(item.documents_attached) ? item.documents_attached : [], statementOfPurpose: item.statement_of_purpose || ""
+    }));
+  } catch {}
+  const map = new Map<string, AdmissionsApplication>();
+  [...mockApplications, ...localApps, ...dbApps].forEach((app) => app?.id && map.set(app.id.trim().toUpperCase(), app));
+  return [...map.values()];
 }
 
 export async function saveApplication(app: AdmissionsApplication): Promise<void> {
   if (!app) return;
-
   if (typeof window !== "undefined") {
-    try {
-      const existing = localStorage.getItem("vva_admissions_apps");
-      const list: AdmissionsApplication[] = existing ? JSON.parse(existing) : mockApplications;
-      const next = [app, ...list.filter((i) => i.id !== app.id)];
-      localStorage.setItem("vva_admissions_apps", JSON.stringify(next));
-    } catch (e) {
-      console.error("Storage error:", e);
-    }
+    try { const old = localStorage.getItem("vva_admissions_apps"); const list = old ? JSON.parse(old) : mockApplications; localStorage.setItem("vva_admissions_apps", JSON.stringify([app, ...list.filter((i: any) => i.id !== app.id)])); } catch {}
   }
-
-  if (supabase) {
-    try {
-      const { error } = await supabase.from("applications").upsert({
-        id: app.id,
-        created_at: app.createdAt,
-        status: app.status,
-        student_name: app.studentName,
-        student_email: app.studentEmail,
-        date_of_birth: app.dateOfBirth,
-        nationality: app.nationality,
-        country_of_residence: app.countryOfResidence,
-        city: app.city,
-        parent_name: app.parentName,
-        parent_email: app.parentEmail,
-        parent_phone: app.parentPhone,
-        target_track: app.targetTrack,
-        grade_level: app.gradeLevel,
-        time_zone: app.timeZone,
-        preferred_cohort_slot: app.preferredCohortSlot,
-        assigned_advisor: app.assignedAdvisor,
-        documents_attached: app.documentsAttached,
-        statement_of_purpose: app.statementOfPurpose,
-      });
-      if (error) console.error("Supabase application save error:", error);
-    } catch (e) {
-      console.error("Supabase save error:", e);
-    }
-  }
+  const { error } = await supabase.from("applications").upsert({ id: app.id, created_at: app.createdAt, status: app.status, student_name: app.studentName, student_email: app.studentEmail, date_of_birth: app.dateOfBirth,
+    nationality: app.nationality, country_of_residence: app.countryOfResidence, city: app.city, parent_name: app.parentName, parent_email: app.parentEmail, parent_phone: app.parentPhone,
+    target_track: app.targetTrack, grade_level: app.gradeLevel, time_zone: app.timeZone, preferred_cohort_slot: app.preferredCohortSlot, assigned_advisor: app.assignedAdvisor,
+    documents_attached: app.documentsAttached, statement_of_purpose: app.statementOfPurpose });
+  if (error) console.error("Supabase application save error:", error);
 }
 
 export async function deleteApplication(id: string): Promise<void> {
   const cleanId = id.trim();
-  if (typeof window !== "undefined") {
-    try {
-      const existing = localStorage.getItem("vva_admissions_apps");
-      if (existing) {
-        const list: AdmissionsApplication[] = JSON.parse(existing);
-        const filtered = list.filter((i) => i.id.toUpperCase() !== cleanId.toUpperCase());
-        localStorage.setItem("vva_admissions_apps", JSON.stringify(filtered));
-      }
-    } catch (e) {
-      console.error("Storage delete application error:", e);
-    }
-  }
-
-  if (supabase) {
-    try {
-      const { error } = await supabase.from("applications").delete().eq("id", cleanId);
-      if (error) console.error("Supabase delete application error:", error);
-    } catch (e) {
-      console.error("Supabase delete error:", e);
-    }
-  }
+  if (typeof window !== "undefined") try { const raw = localStorage.getItem("vva_admissions_apps"); if (raw) localStorage.setItem("vva_admissions_apps", JSON.stringify(JSON.parse(raw).filter((i: any) => i.id?.toUpperCase() !== cleanId.toUpperCase()))); } catch {}
+  const { error } = await supabase.from("applications").delete().eq("id", cleanId); if (error) console.error(error);
 }
 
-export async function findApplicationById(id: string): Promise<AdmissionsApplication | null> {
-  const apps = await getSavedApplications();
-  return apps.find((item) => item.id.toUpperCase() === id.trim().toUpperCase()) || null;
-}
+export async function findApplicationById(id: string): Promise<AdmissionsApplication | null> { return (await getSavedApplications()).find((x) => x.id.toUpperCase() === id.trim().toUpperCase()) || null; }
 
 export async function getStudentAccounts(): Promise<StudentAccount[]> {
-  let localAccounts: StudentAccount[] = [];
-  if (typeof window !== "undefined") {
-    try {
-      const raw = localStorage.getItem("vva_student_accounts");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) localAccounts = parsed;
-      }
-    } catch (e) {
-      console.error("LocalStorage fetch accounts error:", e);
-    }
-  }
-
-  let dbAccounts: StudentAccount[] = [];
-  if (supabase) {
-    try {
-      const { data, error } = await supabase.from("student_accounts").select("*");
-      if (!error && data && Array.isArray(data)) {
-        dbAccounts = data.map((item: any) => ({
-          applicationId: item.application_id || item.applicationId,
-          studentId: item.student_id || item.studentId || item.application_id || item.applicationId,
-          password: item.password,
-          studentName: item.student_name || item.studentName,
-          studentEmail: item.student_email || item.studentEmail,
-          createdAt: item.created_at || item.createdAt,
-        }));
-      }
-    } catch (e) {
-      console.error("Supabase fetch accounts error:", e);
-    }
-  }
-
-  const accountMap = new Map<string, StudentAccount>();
-  [...dbAccounts, ...localAccounts].forEach((acc) => {
-    if (!acc) return;
-    const studentKey = acc.studentId ? acc.studentId.trim().toUpperCase() : "";
-    const appKey = acc.applicationId ? acc.applicationId.trim().toUpperCase() : "";
-
-    if (studentKey) accountMap.set(studentKey, acc);
-    if (appKey) accountMap.set(appKey, acc);
-  });
-
-  return Array.from(new Set(accountMap.values()));
+  let local: StudentAccount[] = [];
+  if (typeof window !== "undefined") try { const raw = localStorage.getItem("vva_student_accounts"); if (raw) local = JSON.parse(raw); } catch {}
+  let cloud: StudentAccount[] = [];
+  try {
+    const { data } = await supabase.from("student_accounts").select("*");
+    cloud = (data || []).map((x: any) => ({ applicationId: x.application_id || x.applicationId, studentId: x.student_id || x.studentId || x.application_id, password: x.password || "", studentName: x.student_name || x.studentName || "Student", studentEmail: x.student_email || x.studentEmail || "", createdAt: x.created_at || x.createdAt || "" }));
+  } catch {}
+  const map = new Map<string, StudentAccount>();
+  [...local, ...cloud].forEach((x) => { if (x?.studentId) map.set(x.studentId.toUpperCase(), x); });
+  return [...map.values()];
 }
 
 export async function saveStudentAccount(account: StudentAccount): Promise<void> {
-  if (!account) return;
-
-  if (typeof window !== "undefined") {
-    try {
-      const raw = localStorage.getItem("vva_student_accounts");
-      const list: StudentAccount[] = raw ? JSON.parse(raw) : [];
-      const filtered = list.filter(
-        (i) =>
-          i.applicationId?.toUpperCase() !== account.applicationId?.toUpperCase() &&
-          i.studentId?.toUpperCase() !== account.studentId?.toUpperCase()
-      );
-      const next = [account, ...filtered];
-      localStorage.setItem("vva_student_accounts", JSON.stringify(next));
-    } catch (e) {
-      console.error("LocalStorage save error:", e);
-    }
-  }
-
-  if (supabase) {
-    try {
-      const { error } = await supabase.from("student_accounts").upsert({
-        application_id: account.applicationId,
-        student_id: account.studentId,
-        password: account.password,
-        student_name: account.studentName,
-        student_email: account.studentEmail,
-        created_at: account.createdAt,
-      });
-      if (error) console.error("Supabase account upsert error:", error);
-    } catch (e) {
-      console.error("Supabase account save error:", e);
-    }
-  }
+  if (typeof window !== "undefined") try { const raw = localStorage.getItem("vva_student_accounts"); const list: StudentAccount[] = raw ? JSON.parse(raw) : []; localStorage.setItem("vva_student_accounts", JSON.stringify([account, ...list.filter((x) => x.studentId?.toUpperCase() !== account.studentId?.toUpperCase())])); } catch {}
+  const { error } = await supabase.from("student_accounts").upsert({ application_id: account.applicationId, student_id: account.studentId, password: account.password, student_name: account.studentName, student_email: account.studentEmail, created_at: account.createdAt }, { onConflict: "student_id" });
+  if (error) console.error("Supabase account save error:", error);
 }
 
 export async function deleteStudentAccount(studentId: string): Promise<void> {
-  const cleanId = studentId.trim();
-  if (typeof window !== "undefined") {
-    try {
-      const raw = localStorage.getItem("vva_student_accounts");
-      if (raw) {
-        const list: StudentAccount[] = JSON.parse(raw);
-        const filtered = list.filter(
-          (i) =>
-            i.studentId?.toUpperCase() !== cleanId.toUpperCase() &&
-            i.applicationId?.toUpperCase() !== cleanId.toUpperCase()
-        );
-        localStorage.setItem("vva_student_accounts", JSON.stringify(filtered));
-      }
-    } catch (e) {
-      console.error("LocalStorage delete account error:", e);
-    }
-  }
-
-  if (supabase) {
-    try {
-      await supabase.from("student_accounts").delete().eq("student_id", cleanId);
-      await supabase.from("student_accounts").delete().eq("application_id", cleanId);
-    } catch (e) {
-      console.error("Supabase delete account error:", e);
-    }
-  }
+  const id = studentId.trim();
+  if (typeof window !== "undefined") try { const raw = localStorage.getItem("vva_student_accounts"); if (raw) localStorage.setItem("vva_student_accounts", JSON.stringify(JSON.parse(raw).filter((x: any) => x.studentId?.toUpperCase() !== id.toUpperCase() && x.applicationId?.toUpperCase() !== id.toUpperCase()))); } catch {}
+  await supabase.from("student_accounts").delete().eq("student_id", id);
 }
 
-export async function getStudentAssignments(studentId: string, defaultList: Assignment[]): Promise<Assignment[]> {
-  if (typeof window !== "undefined") {
-    try {
-      const raw = localStorage.getItem(`vva_assignments_${studentId}`);
-      return raw ? JSON.parse(raw) : defaultList;
-    } catch {
-      return defaultList;
-    }
-  }
+export async function getStudentAssignments(studentId: string, defaultList: Assignment[] = []): Promise<Assignment[]> {
+  try {
+    const { data, error } = await supabase.from("student_assignments").select("assignment").eq("student_id", studentId).order("created_at", { ascending: true });
+    if (!error && data?.length) return data.map((x: any) => x.assignment as Assignment);
+  } catch {}
+  if (typeof window !== "undefined") try { const raw = localStorage.getItem(`vva_assignments_${studentId}`); return raw ? JSON.parse(raw) : defaultList; } catch {}
   return defaultList;
 }
 
 export async function saveStudentAssignments(studentId: string, assignments: Assignment[]): Promise<void> {
-  if (typeof window !== "undefined") {
-    try {
-      localStorage.setItem(`vva_assignments_${studentId}`, JSON.stringify(assignments));
-    } catch (e) {
-      console.error("Storage error:", e);
-    }
-  }
+  if (typeof window !== "undefined") try { localStorage.setItem(`vva_assignments_${studentId}`, JSON.stringify(assignments)); } catch {}
+  try {
+    await supabase.from("student_assignments").delete().eq("student_id", studentId);
+    if (assignments.length) await supabase.from("student_assignments").insert(assignments.map((assignment) => ({ student_id: studentId, assignment, updated_at: new Date().toISOString() })));
+  } catch (error) { console.error("Cloud assignment sync error:", error); }
 }
