@@ -7,8 +7,11 @@ export default function BrandNameReplacer() {
     const replaceBrand = (value: string) =>
       value
         .replace(/\bVisioner Virtual Academy\b/g, "Visioners Virtual Academy")
-        .replace(/\bVisioner Academy\b/g, "Visioners Academy")
+        .replace(/\bVisioners Virtual Academy\b/g, "Visioners Virtual Academy")
+        .replace(/\bVisioner Academy\b/g, "Visioners Virtual Academy")
+        .replace(/\bVisioners Academy\b/g, "Visioners Virtual Academy")
         .replace(/\bVisioner Owner Portal\b/g, "Visioners Owner Portal")
+        .replace(/\bVisioners Owner Portal\b/g, "Visioners Owner Portal")
         .replace(/\bVisioner\b/g, "Visioners");
 
     const updateTextNodes = () => {
