@@ -1385,7 +1385,7 @@ export default function AdmissionsPage() {
               />
               <div className="flex flex-col">
                 <span className="text-lg font-extrabold tracking-tight text-white leading-tight">
-                  Visioner <span style={{ color: "#E8A820" }}>Academy</span>
+                  Visioners Virtual <span style={{ color: "#E8A820" }}>Academy</span>
                 </span>
                 <span className="text-[10px] uppercase font-bold tracking-widest" style={{ color: "#7BA7E8" }}>
                   Global Virtual Campus
