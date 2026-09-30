@@ -26,7 +26,7 @@ export function Logo({ subLabel, size = "md", asLink = true }: LogoProps) {
       />
       <div className="flex flex-col">
         <span className="text-base font-extrabold tracking-tight text-white leading-tight">
-          Visioners <span style={{color:"#E8A820"}}>Academy</span>
+          Visioners <span style={{color:"#E8A820"}}>Virtual Academy</span>
         </span>
         {subLabel && (
           <span className="text-[10px] uppercase font-bold tracking-widest" style={{color:"#7BA7E8"}}>
