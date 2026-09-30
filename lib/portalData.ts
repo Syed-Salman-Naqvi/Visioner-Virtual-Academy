@@ -20,7 +20,6 @@ function readLocal(studentId: string, fallback: PortalRecords): PortalRecords {
   try { const parsed = JSON.parse(localStorage.getItem(KEY) || '{}'); return parsed[studentId] || fallback; } catch { return fallback; }
 }
 
-// Kept synchronous for the owner dashboard's existing initial state. Cloud reads use getStudentPortalRecords().
 export function getPortalRecords(studentId?: string): PortalRecords {
   const fallback = createDynamicStudentProfile({ id: studentId || 'VVA-STU', name: 'Enrolled Student', email: '' });
   return studentId ? readLocal(studentId, fallback) : fallback;
@@ -30,16 +29,44 @@ export async function savePortalRecords(records: any): Promise<void> {
   if (typeof window !== 'undefined') try { localStorage.setItem(KEY, JSON.stringify(records)); } catch {}
 }
 
+/**
+ * Cloud is authoritative across browsers/devices. LocalStorage remains a
+ * migration source for records created before cloud synchronization existed.
+ * When a student has legacy local records and no cloud row yet, migrate them
+ * automatically during the first authenticated load.
+ */
 export async function getStudentPortalRecords(studentId: string): Promise<PortalRecords> {
   const fallback = readLocal(studentId, createDynamicStudentProfile({ id: studentId, name: 'Enrolled Student', email: '' }));
   try {
     const { data, error } = await supabase.from('student_portal_records').select('records').eq('student_id', studentId).maybeSingle();
-    if (!error && data?.records) {
-      const cloud = data.records as PortalRecords;
-      return { ...fallback, ...cloud, studentInfo: { ...fallback.studentInfo, ...cloud.studentInfo } };
+    if (!error) {
+      if (data?.records) {
+        const cloud = data.records as PortalRecords;
+        return { ...fallback, ...cloud, studentInfo: { ...fallback.studentInfo, ...cloud.studentInfo } };
+      }
+      // Migrate the legacy browser copy once. This is what makes data created
+      // in the old owner portal visible from an incognito/new browser.
+      if (hasMeaningfulPortalData(fallback)) {
+        await saveStudentPortalRecords(studentId, fallback);
+      }
+      return fallback;
     }
-  } catch {}
+    console.error('Cloud portal record read error:', error);
+  } catch (error) {
+    console.error('Cloud portal record read exception:', error);
+  }
   return fallback;
+}
+
+function hasMeaningfulPortalData(records: PortalRecords): boolean {
+  return Boolean(
+    records.results?.length ||
+    records.attendance?.length ||
+    records.schedule?.length ||
+    records.assignments?.length ||
+    records.pendingAssignments?.length ||
+    records.studentInfo?.name !== 'Enrolled Student'
+  );
 }
 
 export async function saveStudentPortalRecords(studentId: string, records: PortalRecords): Promise<void> {
