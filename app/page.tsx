@@ -64,7 +64,7 @@ export default function HomePage() {
               />
               <div className="flex flex-col">
                 <span className="text-lg font-extrabold tracking-tight text-white leading-tight">
-                  Visioner Virtual<span style={{color:"#E8A820"}}>Academy</span>
+                  Visioner Virtual <span style={{color:"#E8A820"}}>Academy</span>
                 </span>
                 <span className="text-[10px] uppercase font-bold tracking-widest" style={{color:"#7BA7E8"}}>
                   Global Virtual Campus
