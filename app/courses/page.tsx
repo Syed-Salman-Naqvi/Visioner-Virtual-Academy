@@ -118,7 +118,7 @@ export default function CoursesPage() {
         </div>
       </section>
 
-      {/* Search & Filter Bar */}
+      {/* Search Bar */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex-1 w-full space-y-8">
         <div className="bg-slate-900/90 p-5 rounded-2xl border border-slate-800 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
@@ -148,31 +148,6 @@ export default function CoursesPage() {
                 <option value="Humanities">Humanities & Languages</option>
               </select>
             </div>
-          </div>
-
-          {/* Track Filter Pills */}
-          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800">
-            <span className="text-xs text-slate-400 font-medium mr-2">Filter by Track:</span>
-            {[
-              { key: "all", label: "All Curricula" },
-              { key: "cambridge-a-levels", label: "Cambridge A-Levels" },
-              { key: "advanced-placement", label: "Advanced Placement (AP)" },
-              { key: "cambridge-igcse", label: "Cambridge IGCSE" },
-              { key: "stem-accelerator", label: "STEM & AI Accelerator" },
-              { key: "middle-foundation", label: "Middle School" },
-            ].map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setSelectedTrack(tab.key as AcademicTrack)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                  selectedTrack === tab.key
-                    ? "bg-indigo-600 text-white shadow-sm"
-                    : "bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
           </div>
         </div>
 
@@ -355,5 +330,3 @@ export default function CoursesPage() {
     </div>
   );
 }
-
-
