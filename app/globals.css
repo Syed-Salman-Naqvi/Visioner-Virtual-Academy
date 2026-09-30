@@ -88,6 +88,11 @@ body {
   box-shadow: 0 0 40px rgba(27, 63, 160, 0.4), 0 0 80px rgba(74, 144, 217, 0.15);
 }
 
+/* Main public-site header: deeper navy for stronger logo contrast. */
+header[style*="rgba(13,31,92,0.95)"] {
+  background: rgba(7, 24, 63, 0.97) !important;
+}
+
 /* Admissions: show only the three requested academic pathway options. */
 select[name="targetTrack"] option[value="stem-accelerator"],
 select[name="targetTrack"] option[value="middle-foundation"] {
