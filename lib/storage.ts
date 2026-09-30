@@ -39,8 +39,14 @@ export async function saveApplication(app: AdmissionsApplication): Promise<void>
 
 export async function deleteApplication(id: string): Promise<void> {
   const cleanId = id.trim();
-  if (typeof window !== "undefined") try { const raw = localStorage.getItem("vva_admissions_apps"); if (raw) localStorage.setItem("vva_admissions_apps", JSON.stringify(JSON.parse(raw).filter((i: any) => i.id?.toUpperCase() !== cleanId.toUpperCase()))); } catch {}
-  const { error } = await supabase.from("applications").delete().eq("id", cleanId); if (error) console.error(error);
+  if (typeof window !== "undefined") {
+    try {
+      const raw = localStorage.getItem("vva_admissions_apps");
+      if (raw) localStorage.setItem("vva_admissions_apps", JSON.stringify(JSON.parse(raw).filter((i: any) => i.id?.toUpperCase() !== cleanId.toUpperCase())));
+    } catch {}
+  }
+  const { error } = await supabase.from("applications").delete().eq("id", cleanId);
+  if (error) console.error("Supabase application delete error:", error);
 }
 
 export async function findApplicationById(id: string): Promise<AdmissionsApplication | null> { return (await getSavedApplications()).find((x) => x.id.toUpperCase() === id.trim().toUpperCase()) || null; }
@@ -71,11 +77,14 @@ export async function deleteStudentAccount(studentId: string): Promise<void> {
   if (error) console.error("Supabase account delete error:", error);
 }
 
-/**
- * Canonical cloud assignment store. The existing Supabase `assignments` table
- * is used so the Owner and Student portals read/write exactly the same rows.
- * localStorage is retained only as a migration cache for older installations.
- */
+export async function deleteStudentAssignments(studentId: string): Promise<void> {
+  const id = studentId.trim();
+  if (!id) return;
+  if (typeof window !== "undefined") localStorage.removeItem(`vva_assignments_${id}`);
+  const { error } = await supabase.from("assignments").delete().eq("student_id", id);
+  if (error) console.error("Supabase assignment cleanup error:", error);
+}
+
 export async function getStudentAssignments(studentId: string, defaultList: Assignment[] = []): Promise<Assignment[]> {
   const id = studentId.trim();
   if (!id) return defaultList;
@@ -88,68 +97,33 @@ export async function getStudentAssignments(studentId: string, defaultList: Assi
     const { data, error } = await supabase.from("assignments").select("*").eq("student_id", id).order("created_at", { ascending: true });
     if (!error && data?.length) {
       return data.map((row: any) => ({
-        id: String(row.id),
-        title: row.title || row.assignment?.title || "Untitled assignment",
-        course: row.course || row.subject || row.assignment?.course || "",
-        courseCode: row.course_code || row.subject_code || row.assignment?.courseCode || "",
-        dueDate: row.due_date || row.assignment?.dueDate || "",
-        status: row.status || row.assignment?.status || "pending",
-        instructions: row.instructions || row.description || row.assignment?.instructions || "",
-        score: row.score || row.assignment?.score,
-        feedback: row.feedback || row.assignment?.feedback,
-        urgency: row.urgency || row.assignment?.urgency || "normal",
-        submittedAt: row.submitted_at || row.assignment?.submittedAt,
-        submissionNotes: row.submission_notes || row.assignment?.submissionNotes,
+        id: String(row.id), title: row.title || row.assignment?.title || "Untitled assignment", course: row.course || row.subject || row.assignment?.course || "",
+        courseCode: row.course_code || row.subject_code || row.assignment?.courseCode || "", dueDate: row.due_date || row.assignment?.dueDate || "",
+        status: row.status || row.assignment?.status || "pending", instructions: row.instructions || row.description || row.assignment?.instructions || "",
+        score: row.score || row.assignment?.score, feedback: row.feedback || row.assignment?.feedback, urgency: row.urgency || row.assignment?.urgency || "normal",
+        submittedAt: row.submitted_at || row.assignment?.submittedAt, submissionNotes: row.submission_notes || row.assignment?.submissionNotes,
       } as Assignment));
     }
-    if (!error && (!data || data.length === 0) && local.length) {
-      await saveStudentAssignments(id, local);
-      return local;
-    }
+    if (!error && (!data || data.length === 0) && local.length) { await saveStudentAssignments(id, local); return local; }
     if (error) console.error("Cloud assignments read error:", error);
-  } catch (error) {
-    console.error("Cloud assignments read exception:", error);
-  }
+  } catch (error) { console.error("Cloud assignments read exception:", error); }
   return local.length ? local : defaultList;
 }
 
 export async function saveStudentAssignments(studentId: string, assignments: Assignment[]): Promise<void> {
   const id = studentId.trim();
   if (!id) return;
-  if (typeof window !== "undefined") {
-    try { localStorage.setItem(`vva_assignments_${id}`, JSON.stringify(assignments)); } catch {}
-  }
-
+  if (typeof window !== "undefined") try { localStorage.setItem(`vva_assignments_${id}`, JSON.stringify(assignments)); } catch {}
   try {
     const { error: deleteError } = await supabase.from("assignments").delete().eq("student_id", id);
-    if (deleteError) {
-      console.error("Cloud assignments delete/sync error:", deleteError);
-      return;
-    }
+    if (deleteError) { console.error("Cloud assignments delete/sync error:", deleteError); return; }
     if (assignments.length) {
-      const rows = assignments.map((assignment) => ({
-        id: assignment.id,
-        student_id: id,
-        title: assignment.title,
-        subject: assignment.course,
-        course: assignment.course,
-        subject_code: assignment.courseCode || null,
-        course_code: assignment.courseCode || null,
-        due_date: assignment.dueDate || null,
-        status: assignment.status || "pending",
-        instructions: assignment.instructions || null,
-        score: assignment.score || null,
-        feedback: assignment.feedback || null,
-        urgency: assignment.urgency || "normal",
-        submitted_at: assignment.submittedAt || null,
-        submission_notes: assignment.submissionNotes || null,
-        assignment,
-        updated_at: new Date().toISOString(),
-      }));
+      const rows = assignments.map((assignment) => ({ id: assignment.id, student_id: id, title: assignment.title, subject: assignment.course, course: assignment.course,
+        subject_code: assignment.courseCode || null, course_code: assignment.courseCode || null, due_date: assignment.dueDate || null, status: assignment.status || "pending",
+        instructions: assignment.instructions || null, score: assignment.score || null, feedback: assignment.feedback || null, urgency: assignment.urgency || "normal",
+        submitted_at: assignment.submittedAt || null, submission_notes: assignment.submissionNotes || null, assignment, updated_at: new Date().toISOString() }));
       const { error: insertError } = await supabase.from("assignments").insert(rows);
       if (insertError) console.error("Cloud assignments insert/sync error:", insertError);
     }
-  } catch (error) {
-    console.error("Cloud assignments sync exception:", error);
-  }
+  } catch (error) { console.error("Cloud assignments sync exception:", error); }
 }
