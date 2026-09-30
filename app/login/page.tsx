@@ -63,7 +63,7 @@ export default function LoginPage() {
         </div>
 
         <div className="mb-6 grid grid-cols-2 gap-1 rounded-xl border border-slate-800 bg-slate-900 p-1">
-          {["student", "owner"] as const}.map((item) => (
+          {(["student", "owner"] as const).map((item) => (
             <button key={item} type="button" onClick={() => { setRole(item); setError(""); }}
               className={`rounded-lg py-2.5 text-xs font-bold capitalize ${role === item ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-white"}`}>
               {item === "owner" ? "Teacher / Owner" : "Student"}
