@@ -70,19 +70,57 @@ export async function deleteStudentAccount(studentId: string): Promise<void> {
   await supabase.from("student_accounts").delete().eq("student_id", id);
 }
 
+/**
+ * Supabase is the cross-device source of truth. LocalStorage is used only as a
+ * migration bridge for data created by older versions of the portal.
+ *
+ * If cloud data exists, it always wins. If the cloud table is reachable but
+ * empty and this browser has legacy assignments, those assignments are pushed
+ * to Supabase once, so an incognito/new device can immediately see them.
+ */
 export async function getStudentAssignments(studentId: string, defaultList: Assignment[] = []): Promise<Assignment[]> {
+  const id = studentId.trim();
+  let local: Assignment[] = [];
+  if (typeof window !== "undefined") {
+    try { const raw = localStorage.getItem(`vva_assignments_${id}`); if (raw) local = JSON.parse(raw); } catch {}
+  }
+
   try {
-    const { data, error } = await supabase.from("student_assignments").select("assignment").eq("student_id", studentId).order("created_at", { ascending: true });
-    if (!error && data?.length) return data.map((x: any) => x.assignment as Assignment);
-  } catch {}
-  if (typeof window !== "undefined") try { const raw = localStorage.getItem(`vva_assignments_${studentId}`); return raw ? JSON.parse(raw) : defaultList; } catch {}
-  return defaultList;
+    const { data, error } = await supabase.from("student_assignments").select("assignment").eq("student_id", id).order("created_at", { ascending: true });
+    if (!error) {
+      if (data?.length) return data.map((x: any) => x.assignment as Assignment);
+      if (local.length) {
+        await saveStudentAssignments(id, local);
+        return local;
+      }
+      return defaultList;
+    }
+    console.error("Cloud assignment read error:", error);
+  } catch (error) {
+    console.error("Cloud assignment read exception:", error);
+  }
+
+  return local.length ? local : defaultList;
 }
 
 export async function saveStudentAssignments(studentId: string, assignments: Assignment[]): Promise<void> {
-  if (typeof window !== "undefined") try { localStorage.setItem(`vva_assignments_${studentId}`, JSON.stringify(assignments)); } catch {}
+  const id = studentId.trim();
+  if (!id) return;
+  if (typeof window !== "undefined") try { localStorage.setItem(`vva_assignments_${id}`, JSON.stringify(assignments)); } catch {}
+
   try {
-    await supabase.from("student_assignments").delete().eq("student_id", studentId);
-    if (assignments.length) await supabase.from("student_assignments").insert(assignments.map((assignment) => ({ student_id: studentId, assignment, updated_at: new Date().toISOString() })));
-  } catch (error) { console.error("Cloud assignment sync error:", error); }
+    const { error: deleteError } = await supabase.from("student_assignments").delete().eq("student_id", id);
+    if (deleteError) {
+      console.error("Cloud assignment delete/sync error:", deleteError);
+      return;
+    }
+    if (assignments.length) {
+      const { error: insertError } = await supabase.from("student_assignments").insert(
+        assignments.map((assignment) => ({ student_id: id, assignment, updated_at: new Date().toISOString() }))
+      );
+      if (insertError) console.error("Cloud assignment insert/sync error:", insertError);
+    }
+  } catch (error) {
+    console.error("Cloud assignment sync exception:", error);
+  }
 }
