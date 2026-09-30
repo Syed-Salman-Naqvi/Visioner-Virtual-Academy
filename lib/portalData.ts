@@ -15,17 +15,15 @@ export const createDynamicStudentProfile = (studentInfo: { id: string; name: str
 });
 
 const KEY = 'vva_portal_records_db';
-function localRecords(studentId: string, fallback: PortalRecords): PortalRecords {
+function readLocal(studentId: string, fallback: PortalRecords): PortalRecords {
   if (typeof window === 'undefined') return fallback;
-  try {
-    const parsed = JSON.parse(localStorage.getItem(KEY) || '{}');
-    return parsed[studentId] || fallback;
-  } catch { return fallback; }
+  try { const parsed = JSON.parse(localStorage.getItem(KEY) || '{}'); return parsed[studentId] || fallback; } catch { return fallback; }
 }
 
-export async function getPortalRecords(studentId?: string): Promise<PortalRecords> {
+// Kept synchronous for the owner dashboard's existing initial state. Cloud reads use getStudentPortalRecords().
+export function getPortalRecords(studentId?: string): PortalRecords {
   const fallback = createDynamicStudentProfile({ id: studentId || 'VVA-STU', name: 'Enrolled Student', email: '' });
-  return studentId ? getStudentPortalRecords(studentId) : fallback;
+  return studentId ? readLocal(studentId, fallback) : fallback;
 }
 
 export async function savePortalRecords(records: any): Promise<void> {
@@ -33,16 +31,15 @@ export async function savePortalRecords(records: any): Promise<void> {
 }
 
 export async function getStudentPortalRecords(studentId: string): Promise<PortalRecords> {
-  const fallback = createDynamicStudentProfile({ id: studentId, name: 'Enrolled Student', email: '' });
+  const fallback = readLocal(studentId, createDynamicStudentProfile({ id: studentId, name: 'Enrolled Student', email: '' }));
   try {
     const { data, error } = await supabase.from('student_portal_records').select('records').eq('student_id', studentId).maybeSingle();
     if (!error && data?.records) {
       const cloud = data.records as PortalRecords;
-      savePortalRecords({ [studentId]: cloud });
       return { ...fallback, ...cloud, studentInfo: { ...fallback.studentInfo, ...cloud.studentInfo } };
     }
   } catch {}
-  return localRecords(studentId, fallback);
+  return fallback;
 }
 
 export async function saveStudentPortalRecords(studentId: string, records: PortalRecords): Promise<void> {
@@ -68,30 +65,24 @@ export async function getStudentPortalData(studentId: string, sessionUser?: any)
     if (sessionUser?.email) cloud.studentInfo.email = sessionUser.email;
     return cloud;
   }
-
   try {
     const { data } = await supabase.from('students').select('*').or(`student_id.eq.${activeId},id.eq.${activeId},email.eq.${activeId}`).maybeSingle();
     if (data) {
       const profile = createDynamicStudentProfile({ id: data.student_id || data.id || activeId, name: data.name || data.full_name || data.student_name || sessionUser?.name || 'Student', email: data.email || sessionUser?.email || '', program: data.program || data.target_program });
-      await saveStudentPortalRecords(activeId, profile);
-      return profile;
+      await saveStudentPortalRecords(activeId, profile); return profile;
     }
   } catch {}
-
   try {
     const apps = await getSavedApplications();
     const app = apps.find((x: any) => x.id === activeId || x.studentEmail === activeId);
     if (app) {
       const profile = createDynamicStudentProfile({ id: app.id, name: app.studentName, email: app.studentEmail, program: app.targetTrack });
-      await saveStudentPortalRecords(activeId, profile);
-      return profile;
+      await saveStudentPortalRecords(activeId, profile); return profile;
     }
   } catch {}
-
   if (sessionUser?.name) {
     const profile = createDynamicStudentProfile({ id: activeId, name: sessionUser.name, email: sessionUser.email || '', program: sessionUser.program });
-    await saveStudentPortalRecords(activeId, profile);
-    return profile;
+    await saveStudentPortalRecords(activeId, profile); return profile;
   }
   return cloud;
 }
