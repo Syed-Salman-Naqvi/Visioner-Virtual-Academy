@@ -10,7 +10,7 @@
   --brand-gold-light: #F5C842;
   --background: #0D1F5C;
   --foreground: #F0F4FF;
-  --header-bg: rgba(13, 31, 92, 0.92);
+  --header-bg: #071840;
   --card-bg: rgba(27, 63, 160, 0.18);
   --card-border: rgba(74, 144, 217, 0.25);
   --btn-primary: #1B3FA0;
@@ -88,9 +88,9 @@ body {
   box-shadow: 0 0 40px rgba(27, 63, 160, 0.4), 0 0 80px rgba(74, 144, 217, 0.15);
 }
 
-/* Main public-site header: match the logo's exact background for seamless blending. */
-header[style*="rgba(13,31,92,0.95)"] {
-  background: #071840 !important;
+/* Keep the public home header on the logo-matching navy during client-side navigation too. */
+header[style*="rgba(13,31,92"] {
+  background: var(--header-bg) !important;
 }
 
 /* Admissions: show only the three requested academic pathway options. */
