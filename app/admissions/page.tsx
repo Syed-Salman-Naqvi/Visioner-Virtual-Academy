@@ -63,7 +63,7 @@
 //     preferredContact: "email",
 
 //     targetTrack: "sindh-board",
-//     gradeLevel: "grade-11",
+//     gradeLevel: "grade-1",
 //     previousSchool: "",
 //     previousSchoolCountry: "",
 //     subjectsOfInterest: ["Physics", "Mathematics (Pure & Mechanics)"],
@@ -1168,7 +1168,7 @@ export default function AdmissionsPage() {
     preferredContact: "email",
 
     targetTrack: "sindh-board",
-    gradeLevel: "grade-11",
+    gradeLevel: "grade-1",
     previousSchool: "",
     previousSchoolCountry: "",
     subjectsOfInterest: ["Physics", "Mathematics (Pure & Mechanics)"],
@@ -1746,11 +1746,25 @@ export default function AdmissionsPage() {
                               onChange={handleInputChange}
                               className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500"
                             >
-                              <option value="grade-9">Grade 9 / Year 10 (IGCSE)</option>
-                              <option value="grade-10">Grade 10 / Year 11 (IGCSE)</option>
-                              <option value="grade-11">Grade 11 / Year 12 (AS-Level / AP)</option>
-                              <option value="grade-12">Grade 12 / Year 13 (A2-Level / AP)</option>
-                              <option value="grade-6-8">Grades 6 - 8 (Middle School)</option>
+                              <option value="grade-1">Grade 1</option>
+
+                              <option value="grade-2">Grade 2</option>
+
+                              <option value="grade-3">Grade 3</option>
+
+                              <option value="grade-4">Grade 4</option>
+
+                              <option value="grade-5">Grade 5</option>
+
+                              <option value="grade-6">Grade 6</option>
+
+                              <option value="grade-7">Grade 7</option>
+
+                              <option value="grade-8">Grade 8</option>
+
+                              <option value="grade-9">Grade 9</option>
+
+                              <option value="grade-10">Grade 10</option>
                             </select>
                           </div>
                         </div>
