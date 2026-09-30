@@ -33,10 +33,8 @@ export async function savePortalRecords(records: any): Promise<void> {
 
 function mergePortalRecords(base: PortalRecords, cloud: Partial<PortalRecords>): PortalRecords {
   return {
-    ...base,
-    ...cloud,
-    studentInfo: { ...base.studentInfo, ...(cloud.studentInfo || {}) },
-    stats: { ...base.stats, ...(cloud.stats || {}) },
+    ...base, ...cloud,
+    studentInfo: { ...base.studentInfo, ...(cloud.studentInfo || {}) }, stats: { ...base.stats, ...(cloud.stats || {}) },
     results: Array.isArray(cloud.results) ? cloud.results : base.results,
     recentResults: Array.isArray(cloud.recentResults) ? cloud.recentResults : (Array.isArray(cloud.results) ? cloud.results : base.recentResults),
     assignments: Array.isArray(cloud.assignments) ? cloud.assignments : base.assignments,
@@ -48,20 +46,14 @@ function mergePortalRecords(base: PortalRecords, cloud: Partial<PortalRecords>):
   };
 }
 
-/** Supabase is the source of truth. The browser copy is only a migration cache. */
 export async function getStudentPortalRecords(studentId: string): Promise<PortalRecords> {
   const fallback = readLocal(studentId, createDynamicStudentProfile({ id: studentId, name: 'Enrolled Student', email: '' }));
   try {
     const { data, error } = await supabase.from('portal_records').select('records').eq('student_id', studentId).maybeSingle();
     if (!error && data?.records) return mergePortalRecords(fallback, data.records as PortalRecords);
-    if (!error && !data && hasMeaningfulPortalData(fallback)) {
-      await saveStudentPortalRecords(studentId, fallback);
-      return fallback;
-    }
+    if (!error && !data && hasMeaningfulPortalData(fallback)) { await saveStudentPortalRecords(studentId, fallback); return fallback; }
     if (error) console.error('Cloud portal_records read error:', error);
-  } catch (error) {
-    console.error('Cloud portal_records read exception:', error);
-  }
+  } catch (error) { console.error('Cloud portal_records read exception:', error); }
   return fallback;
 }
 
@@ -73,14 +65,24 @@ export async function saveStudentPortalRecords(studentId: string, records: Porta
   const cleanId = studentId.trim();
   if (!cleanId) return;
   if (typeof window !== 'undefined') {
-    try {
-      const all = JSON.parse(localStorage.getItem(KEY) || '{}');
-      all[cleanId] = records;
-      localStorage.setItem(KEY, JSON.stringify(all));
-    } catch {}
+    try { const all = JSON.parse(localStorage.getItem(KEY) || '{}'); all[cleanId] = records; localStorage.setItem(KEY, JSON.stringify(all)); } catch {}
   }
   const { error } = await supabase.from('portal_records').upsert({ student_id: cleanId, records, updated_at: new Date().toISOString() }, { onConflict: 'student_id' });
   if (error) console.error('Cloud portal_records sync error:', error);
+}
+
+export async function deleteStudentPortalRecords(studentId: string): Promise<void> {
+  const cleanId = studentId.trim();
+  if (!cleanId) return;
+  if (typeof window !== 'undefined') {
+    try {
+      const all = JSON.parse(localStorage.getItem(KEY) || '{}');
+      delete all[cleanId];
+      localStorage.setItem(KEY, JSON.stringify(all));
+    } catch {}
+  }
+  const { error } = await supabase.from('portal_records').delete().eq('student_id', cleanId);
+  if (error) console.error('Supabase portal record cleanup error:', error);
 }
 
 export async function migrateStudentPortalRecords(studentId: string, targetStudentId?: string): Promise<PortalRecords> {
@@ -96,25 +98,20 @@ export async function getStudentPortalData(studentId: string, sessionUser?: any)
   if (sessionUser?.name && cloud.studentInfo.name === 'Enrolled Student') cloud.studentInfo.name = sessionUser.name;
   if (sessionUser?.email && !cloud.studentInfo.email) cloud.studentInfo.email = sessionUser.email;
   if (cloud.studentInfo.name !== 'Enrolled Student' || cloud.results.length || cloud.schedule.length || cloud.attendance.length || cloud.assignments.length) return cloud;
-
   try {
     const { data } = await supabase.from('students').select('*').or(`student_id.eq.${activeId},id.eq.${activeId},email.eq.${activeId}`).maybeSingle();
     if (data) {
       const profile = createDynamicStudentProfile({ id: data.student_id || data.id || activeId, name: data.name || data.full_name || data.student_name || sessionUser?.name || 'Student', email: data.email || sessionUser?.email || '', program: data.program || data.target_program });
-      await saveStudentPortalRecords(activeId, profile);
-      return profile;
+      await saveStudentPortalRecords(activeId, profile); return profile;
     }
   } catch (error) { console.warn('Student profile lookup skipped:', error); }
-
   try {
     const apps = await getSavedApplications();
     const app = apps.find((x: any) => x.id === activeId || x.studentEmail === activeId);
     if (app) {
       const profile = createDynamicStudentProfile({ id: app.id, name: app.studentName, email: app.studentEmail, program: app.targetTrack });
-      await saveStudentPortalRecords(activeId, profile);
-      return profile;
+      await saveStudentPortalRecords(activeId, profile); return profile;
     }
   } catch (error) { console.warn('Application lookup skipped:', error); }
-
   return cloud;
 }
