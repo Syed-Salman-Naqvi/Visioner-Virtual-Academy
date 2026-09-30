@@ -1,360 +1,119 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
-import { Award, BookOpen, CalendarDays, CheckCircle2, ClipboardList, GraduationCap, LogOut, Plus, Save, Trash2, Users } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Award, BookOpen, CalendarDays, CheckCircle2, ClipboardList, Copy, GraduationCap, KeyRound, LogOut, Pencil, Plus, RefreshCw, Save, Trash2, Users } from "lucide-react";
 import { clearPortalSession, getPortalSession, loginOwner, savePortalSession, PortalUser } from "@/lib/auth";
-import { getSavedApplications, getStudentAccounts, getStudentAssignments, saveStudentAccount, saveStudentAssignments } from "@/lib/storage";
+import { deleteApplication, deleteStudentAccount, deleteStudentAssignments, getSavedApplications, getStudentAccounts, getStudentAssignments, saveStudentAccount, saveStudentAssignments } from "@/lib/storage";
 import { AdmissionsApplication, Assignment, StudentAccount } from "@/lib/types";
-import { AcademicResult, AttendanceRecord, PortalRecords, ScheduleRecord, getStudentPortalRecords, saveStudentPortalRecords } from "@/lib/portalData";
+import { AcademicResult, AttendanceRecord, PortalRecords, ScheduleRecord, deleteStudentPortalRecords, getStudentPortalRecords, saveStudentPortalRecords } from "@/lib/portalData";
 
-type Tab = "overview" | "students" | "assignments" | "academic" | "timetable" | "attendance";
-
+type Tab = "overview" | "enrollments" | "credentials" | "assignments" | "academic" | "timetable" | "attendance";
 const inputClass = "w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500";
 const emptyResult: AcademicResult = { id: "", course: "", code: "", score: "", grade: "", feedback: "" };
 const emptyAttendance: AttendanceRecord = { id: "", date: "", course: "", status: "Present", totalClasses: 1, attended: 1 };
 const emptySchedule: ScheduleRecord = { id: "", day: "Monday", time: "", subject: "", course: "", teacher: "", room: "" };
-const emptyAssignment: Assignment = { id: "", title: "", course: "", courseCode: "", dueDate: "", status: "pending", instructions: "", score: "100 pts", urgency: "normal" };
+const emptyAssignment: Assignment = { id: "", title: "", course: "", courseCode: "", dueDate: "", status: "pending", instructions: "", score: "", urgency: "normal" };
+
+function numericScore(value: unknown) { const match = String(value ?? "").match(/\d+(?:\.\d+)?/); return match ? Number(match[0]) : 0; }
+function calculateAverage(results: AcademicResult[]) { return results.length ? Math.round(results.reduce((sum, item) => sum + numericScore(item.score), 0) / results.length) : 0; }
+function calculateAttendance(rows: AttendanceRecord[]) { const total = rows.reduce((sum, row) => sum + Number(row.totalClasses || 0), 0); const attended = rows.reduce((sum, row) => sum + Number(row.attended || 0), 0); return total ? Math.round((attended / total) * 100) : 0; }
+function makePassword() { return `VVA${Math.floor(100000 + Math.random() * 900000)}`; }
 
 export default function OwnerPage() {
-  const [checkedSession, setCheckedSession] = useState(false);
-  const [owner, setOwner] = useState<PortalUser | null>(null);
-  const [ownerId, setOwnerId] = useState("");
-  const [ownerPassword, setOwnerPassword] = useState("");
-  const [loginError, setLoginError] = useState("");
-  const [tab, setTab] = useState<Tab>("overview");
-  const [message, setMessage] = useState("");
-  const [applications, setApplications] = useState<AdmissionsApplication[]>([]);
-  const [accounts, setAccounts] = useState<StudentAccount[]>([]);
-  const [selectedId, setSelectedId] = useState("");
-  const [records, setRecords] = useState<PortalRecords | null>(null);
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [assignment, setAssignment] = useState<Assignment>(emptyAssignment);
-  const [result, setResult] = useState<AcademicResult>(emptyResult);
-  const [editingResult, setEditingResult] = useState<string | null>(null);
-  const [attendance, setAttendance] = useState<AttendanceRecord>(emptyAttendance);
-  const [editingAttendance, setEditingAttendance] = useState<string | null>(null);
-  const [schedule, setSchedule] = useState<ScheduleRecord>(emptySchedule);
-  const [editingSchedule, setEditingSchedule] = useState<string | null>(null);
-  const [subjectName, setSubjectName] = useState("");
-  const [subjectCode, setSubjectCode] = useState("");
+  const [checkedSession, setCheckedSession] = useState(false); const [owner, setOwner] = useState<PortalUser | null>(null);
+  const [ownerId, setOwnerId] = useState(""); const [ownerPassword, setOwnerPassword] = useState(""); const [loginError, setLoginError] = useState("");
+  const [tab, setTab] = useState<Tab>("overview"); const [message, setMessage] = useState(""); const [loading, setLoading] = useState(false);
+  const [applications, setApplications] = useState<AdmissionsApplication[]>([]); const [accounts, setAccounts] = useState<StudentAccount[]>([]); const [selectedId, setSelectedId] = useState("");
+  const [records, setRecords] = useState<PortalRecords | null>(null); const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [assignment, setAssignment] = useState<Assignment>(emptyAssignment); const [result, setResult] = useState<AcademicResult>(emptyResult); const [editingResult, setEditingResult] = useState<string | null>(null);
+  const [attendance, setAttendance] = useState<AttendanceRecord>(emptyAttendance); const [editingAttendance, setEditingAttendance] = useState<string | null>(null);
+  const [schedule, setSchedule] = useState<ScheduleRecord>(emptySchedule); const [editingSchedule, setEditingSchedule] = useState<string | null>(null);
+  const [subjectName, setSubjectName] = useState(""); const [subjectCode, setSubjectCode] = useState("");
 
-  useEffect(() => {
-    const session = getPortalSession();
-    if (session?.role === "owner") setOwner(session);
-    setCheckedSession(true);
-  }, []);
+  const notify = (text: string) => { setMessage(text); window.setTimeout(() => setMessage(""), 3500); };
+  const selectedAccount = accounts.find((x) => x.studentId === selectedId);
+  const selectedApplication = applications.find((x) => x.id === selectedId || x.id === selectedAccount?.applicationId);
+  const selectedName = selectedAccount?.studentName || selectedApplication?.studentName || "No student selected";
 
-  useEffect(() => {
-    if (!owner) return;
-    let cancelled = false;
-    const load = async () => {
-      const [apps, accts] = await Promise.all([getSavedApplications(), getStudentAccounts()]);
-      if (cancelled) return;
-      setApplications(apps);
-      setAccounts(accts);
-      const firstId = selectedId || accts[0]?.studentId || apps[0]?.id || "";
-      if (firstId) await loadStudent(firstId, true);
-    };
-    void load();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [owner]);
-
-  useEffect(() => {
-    if (!owner || !selectedId) return;
-    const timer = window.setInterval(() => { void loadStudent(selectedId, false); }, 5000);
-    return () => window.clearInterval(timer);
-  }, [owner, selectedId]);
-
-  const notify = (text: string) => {
-    setMessage(text);
-    window.setTimeout(() => setMessage(""), 3000);
-  };
-
-  async function loadStudent(id: string, select = true) {
-    if (!id) return;
-    if (select) setSelectedId(id);
-    const [portal, studentAssignments] = await Promise.all([getStudentPortalRecords(id), getStudentAssignments(id, [])]);
-    setRecords(portal);
-    setAssignments(studentAssignments);
+  async function refreshStudents(preferredId = selectedId) {
+    const [apps, accts] = await Promise.all([getSavedApplications(), getStudentAccounts()]);
+    setApplications(apps); setAccounts(accts);
+    const id = preferredId && (accts.some((x) => x.studentId === preferredId) || apps.some((x) => x.id === preferredId)) ? preferredId : accts[0]?.studentId || apps[0]?.id || "";
+    if (id) await loadStudent(id); else { setSelectedId(""); setRecords(null); setAssignments([]); }
   }
 
-  async function handleOwnerLogin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setLoginError("");
-    const user = await loginOwner(ownerId, ownerPassword);
-    if (!user) {
-      setLoginError("Invalid owner username/email or password.");
-      return;
-    }
-    savePortalSession(user);
-    setOwner(user);
+  async function loadStudent(id: string) {
+    if (!id) return; setSelectedId(id);
+    const [portal, asgs] = await Promise.all([getStudentPortalRecords(id), getStudentAssignments(id, [])]);
+    setRecords(portal); setAssignments(asgs);
   }
 
-  function signOut() {
-    clearPortalSession();
-    setOwner(null);
-    setSelectedId("");
-    setRecords(null);
-    setAssignments([]);
-  }
+  useEffect(() => { const session = getPortalSession(); if (session?.role === "owner") setOwner(session); setCheckedSession(true); }, []);
+  useEffect(() => { if (owner) void refreshStudents(); }, [owner]);
+  useEffect(() => { if (!owner || !selectedId) return; const timer = window.setInterval(() => void loadStudent(selectedId), 5000); return () => window.clearInterval(timer); }, [owner, selectedId]);
+
+  async function handleOwnerLogin(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setLoginError(""); const user = await loginOwner(ownerId, ownerPassword); if (!user) { setLoginError("Invalid owner username/email or password."); return; } savePortalSession(user); setOwner(user); }
+  function signOut() { clearPortalSession(); setOwner(null); setSelectedId(""); setRecords(null); setAssignments([]); }
 
   async function generateStudentAccount(application: AdmissionsApplication) {
-    const existing = accounts.find((account) => account.applicationId === application.id || account.studentId === application.id);
-    const account: StudentAccount = existing || {
-      applicationId: application.id,
-      studentId: application.id,
-      password: `VVA${Math.floor(100000 + Math.random() * 900000)}`,
-      studentName: application.studentName,
-      studentEmail: application.studentEmail,
-      createdAt: new Date().toISOString(),
-    };
-    await saveStudentAccount(account);
-    setAccounts(await getStudentAccounts());
-    await loadStudent(account.studentId, true);
-    notify(`Student account ready: ${account.studentId}`);
+    setLoading(true); try { const existing = accounts.find((x) => x.applicationId === application.id || x.studentId === application.id); const account: StudentAccount = existing || { applicationId: application.id, studentId: application.id, password: makePassword(), studentName: application.studentName, studentEmail: application.studentEmail, createdAt: new Date().toISOString() }; await saveStudentAccount(account); await refreshStudents(account.studentId); setTab("credentials"); notify("Student credentials saved globally."); } finally { setLoading(false); }
+  }
+  async function regeneratePassword() { if (!selectedAccount) return; const account = { ...selectedAccount, password: makePassword() }; await saveStudentAccount(account); await refreshStudents(account.studentId); notify("New student password saved to Supabase."); }
+  async function copyCredentials() { if (!selectedAccount) return; await navigator.clipboard?.writeText(`Student ID: ${selectedAccount.studentId}\nPassword: ${selectedAccount.password}`); notify("Credentials copied."); }
+
+  async function deleteEnrollment(application: AdmissionsApplication) {
+    const account = accounts.find((x) => x.applicationId === application.id || x.studentId === application.id); const studentId = account?.studentId || application.id;
+    if (!window.confirm(`Delete enrollment for ${application.studentName}?\n\nThis removes the application, student login, assignments, grades, timetable, attendance and subjects.`)) return;
+    setLoading(true); try { await Promise.all([deleteApplication(application.id), deleteStudentAccount(studentId), deleteStudentAssignments(studentId), deleteStudentPortalRecords(studentId)]); await refreshStudents(selectedId === studentId ? "" : selectedId); setTab("enrollments"); notify("Enrollment and all linked student data were deleted."); } finally { setLoading(false); }
   }
 
-  async function saveRecords(next: PortalRecords) {
+  async function saveRecords(next: PortalRecords, nextAssignments = assignments) {
     if (!selectedId) return;
-    const clean: PortalRecords = {
-      ...next,
-      stats: {
-        ...next.stats,
-        averagePerformance: `${calculateAverage(next.results)}%`,
-        classAttendance: `${calculateAttendance(next.attendance)}%`,
-        pendingHomework: assignments.filter((item) => item.status === "pending").length,
-        activeSubjectsCount: (next.subjects || []).length,
-      },
-      assignments,
-      pendingAssignments: assignments.filter((item) => item.status === "pending"),
-    };
-    setRecords(clean);
-    await saveStudentPortalRecords(selectedId, clean);
-    notify("Saved to Supabase. Student portal updated globally.");
+    const clean: PortalRecords = { ...next, assignments: nextAssignments, pendingAssignments: nextAssignments.filter((x) => x.status === "pending"), stats: { ...next.stats, averagePerformance: `${calculateAverage(next.results)}%`, classAttendance: `${calculateAttendance(next.attendance)}%`, pendingHomework: nextAssignments.filter((x) => x.status === "pending").length, activeSubjectsCount: (next.subjects || []).length } };
+    setRecords(clean); await saveStudentPortalRecords(selectedId, clean); notify("Saved to Supabase. Student portal updated.");
   }
 
-  async function submitAssignment(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!selectedId || !assignment.title.trim() || !assignment.course.trim()) return;
-    const item: Assignment = {
-      ...assignment,
-      id: assignment.id || `asg-${Date.now()}`,
-      title: assignment.title.trim(),
-      course: assignment.course.trim(),
-      status: assignment.status || "pending",
-    };
-    const next = assignment.id ? assignments.map((current) => current.id === assignment.id ? item : current) : [item, ...assignments];
-    setAssignments(next);
-    await saveStudentAssignments(selectedId, next);
-    if (records) await saveRecords({ ...records, assignments: next });
-    setAssignment({ ...emptyAssignment });
-    notify(assignment.id ? "Assignment updated globally." : "Assignment published globally.");
-  }
+  async function saveAssignment(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (!selectedId || !assignment.title.trim() || !assignment.course.trim()) return; const item = { ...assignment, id: assignment.id || `asg-${Date.now()}`, title: assignment.title.trim(), course: assignment.course.trim() }; const next = assignment.id ? assignments.map((x) => x.id === assignment.id ? item : x) : [item, ...assignments]; setAssignments(next); await saveStudentAssignments(selectedId, next); if (records) await saveRecords(records, next); setAssignment({ ...emptyAssignment }); notify(assignment.id ? "Assignment updated." : "Assignment published."); }
+  async function deleteAssignment(id: string) { const next = assignments.filter((x) => x.id !== id); setAssignments(next); await saveStudentAssignments(selectedId, next); if (records) await saveRecords(records, next); notify("Assignment deleted."); }
+  async function gradeAssignment(item: Assignment) { const score = window.prompt("Score", item.score || ""); if (score === null) return; const feedback = window.prompt("Feedback", item.feedback || "") ?? ""; const next = assignments.map((x) => x.id === item.id ? { ...x, score, feedback, status: "graded" } : x); setAssignments(next); await saveStudentAssignments(selectedId, next); if (records) await saveRecords(records, next); notify("Grade published."); }
 
-  async function deleteAssignment(id: string) {
-    if (!selectedId) return;
-    const next = assignments.filter((item) => item.id !== id);
-    setAssignments(next);
-    await saveStudentAssignments(selectedId, next);
-    if (records) await saveRecords({ ...records, assignments: next });
-    notify("Assignment removed globally.");
-  }
+  async function saveResult(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (!records || !result.course || !result.score) return; const item = { ...result, id: editingResult || `result-${Date.now()}` }; const next = editingResult ? records.results.map((x) => x.id === editingResult ? item : x) : [...records.results, item]; await saveRecords({ ...records, results: next, recentResults: next.slice(-5).reverse() }); setResult({ ...emptyResult }); setEditingResult(null); }
+  async function deleteResult(id: string) { if (records) await saveRecords({ ...records, results: records.results.filter((x) => x.id !== id) }); }
+  async function saveAttendance(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (!records || !attendance.course || !attendance.date) return; const total = Math.max(1, Number(attendance.totalClasses || 1)); const attended = Math.max(0, Math.min(total, Number(attendance.attended || 0))); const item = { ...attendance, id: editingAttendance || `attendance-${Date.now()}`, totalClasses: total, attended, percentage: `${Math.round((attended / total) * 100)}%` }; const next = editingAttendance ? records.attendance.map((x) => x.id === editingAttendance ? item : x) : [...records.attendance, item]; await saveRecords({ ...records, attendance: next }); setAttendance({ ...emptyAttendance }); setEditingAttendance(null); }
+  async function deleteAttendance(id: string) { if (records) await saveRecords({ ...records, attendance: records.attendance.filter((x) => x.id !== id) }); }
+  async function saveSchedule(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (!records || !schedule.subject || !schedule.time) return; const item = { ...schedule, id: editingSchedule || `schedule-${Date.now()}`, course: schedule.course || schedule.subject }; const next = editingSchedule ? records.schedule.map((x) => x.id === editingSchedule ? item : x) : [...records.schedule, item]; await saveRecords({ ...records, schedule: next, timetable: next }); setSchedule({ ...emptySchedule }); setEditingSchedule(null); }
+  async function deleteSchedule(id: string) { if (records) { const next = records.schedule.filter((x) => String(x.id) !== id); await saveRecords({ ...records, schedule: next, timetable: next }); } }
+  async function addSubject() { if (!records || !subjectName.trim()) return; const value = subjectCode.trim() ? `${subjectName.trim()} (${subjectCode.trim()})` : subjectName.trim(); if ((records.subjects || []).includes(value)) return; await saveRecords({ ...records, subjects: [...(records.subjects || []), value] }); setSubjectName(""); setSubjectCode(""); }
+  async function deleteSubject(value: string) { if (records) await saveRecords({ ...records, subjects: (records.subjects || []).filter((x) => x !== value) }); }
 
-  async function gradeAssignment(item: Assignment) {
-    const score = window.prompt("Enter score", item.score || "");
-    if (score === null) return;
-    const feedback = window.prompt("Feedback", item.feedback || "") ?? "";
-    const next = assignments.map((current) => current.id === item.id ? { ...current, score, feedback, status: "graded" } : current);
-    setAssignments(next);
-    await saveStudentAssignments(selectedId, next);
-    notify("Assignment grade published globally.");
-  }
-
-  async function saveResult(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!records || !result.course || !result.score) return;
-    const item: AcademicResult = { ...result, id: editingResult || `result-${Date.now()}` };
-    const next = editingResult ? records.results.map((current) => current.id === editingResult ? item : current) : [...records.results, item];
-    await saveRecords({ ...records, results: next, recentResults: next.slice(-5).reverse() });
-    setResult({ ...emptyResult });
-    setEditingResult(null);
-  }
-
-  async function deleteResult(id: string) {
-    if (!records) return;
-    await saveRecords({ ...records, results: records.results.filter((item) => item.id !== id) });
-  }
-
-  async function saveAttendance(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!records || !attendance.course || !attendance.date) return;
-    const total = Math.max(1, Number(attendance.totalClasses || 1));
-    const attended = Math.max(0, Number(attendance.attended ?? 0));
-    const item: AttendanceRecord = {
-      ...attendance,
-      id: editingAttendance || `attendance-${Date.now()}`,
-      totalClasses: total,
-      attended,
-      percentage: `${Math.min(100, Math.round((attended / total) * 100))}%`,
-    };
-    const next = editingAttendance ? records.attendance.map((current) => current.id === editingAttendance ? item : current) : [...records.attendance, item];
-    await saveRecords({ ...records, attendance: next });
-    setAttendance({ ...emptyAttendance });
-    setEditingAttendance(null);
-  }
-
-  async function deleteAttendance(id: string) {
-    if (!records) return;
-    await saveRecords({ ...records, attendance: records.attendance.filter((item) => item.id !== id) });
-  }
-
-  async function saveSchedule(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!records || !schedule.subject || !schedule.time) return;
-    const item: ScheduleRecord = { ...schedule, id: editingSchedule || `schedule-${Date.now()}`, course: schedule.course || schedule.subject };
-    const next = editingSchedule ? records.schedule.map((current) => current.id === editingSchedule ? item : current) : [...records.schedule, item];
-    await saveRecords({ ...records, schedule: next, timetable: next });
-    setSchedule({ ...emptySchedule });
-    setEditingSchedule(null);
-  }
-
-  async function deleteSchedule(id: string) {
-    if (!records) return;
-    const next = records.schedule.filter((item) => String(item.id) !== id);
-    await saveRecords({ ...records, schedule: next, timetable: next });
-  }
-
-  async function addSubject() {
-    if (!records) return;
-    const name = subjectName.trim();
-    if (!name) return;
-    const value = subjectCode.trim() ? `${name} (${subjectCode.trim()})` : name;
-    if ((records.subjects || []).includes(value)) return;
-    await saveRecords({ ...records, subjects: [...(records.subjects || []), value] });
-    setSubjectName("");
-    setSubjectCode("");
-  }
-
-  async function deleteSubject(value: string) {
-    if (!records) return;
-    await saveRecords({ ...records, subjects: (records.subjects || []).filter((subject) => subject !== value) });
-  }
-
-  const selectedAccount = accounts.find((account) => account.studentId === selectedId);
-  const selectedApplication = applications.find((application) => application.id === selectedId || application.id === selectedAccount?.applicationId);
-  const subjects = records?.subjects || [];
-  const average = records ? calculateAverage(records.results) : 0;
-  const attendancePercentage = records ? calculateAttendance(records.attendance) : 0;
+  const stats = useMemo(() => ({ students: accounts.length, enrollments: applications.length, assignments: assignments.length, average: records ? calculateAverage(records.results) : 0, attendance: records ? calculateAttendance(records.attendance) : 0 }), [accounts, applications, assignments, records]);
+  const tabs: Array<[Tab, string, any]> = [["overview", "Overview", Award], ["enrollments", "Enrollments", Users], ["credentials", "Credentials", KeyRound], ["assignments", "Assignments", ClipboardList], ["academic", "Subjects & Results", BookOpen], ["timetable", "Timetable", CalendarDays], ["attendance", "Attendance", CheckCircle2]];
 
   if (!checkedSession) return <main className="min-h-screen bg-slate-950" />;
+  if (!owner) return <main className="grid min-h-screen place-items-center bg-slate-950 p-4 text-white"><form onSubmit={handleOwnerLogin} className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-8"><div className="text-center"><div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-indigo-600"><GraduationCap /></div><h1 className="mt-4 text-2xl font-black">Visioner Owner Portal</h1><p className="mt-1 text-xs text-slate-400">Global academy management</p></div>{loginError && <div className="my-4 rounded-xl bg-rose-500/10 p-3 text-xs text-rose-300">{loginError}</div>}<input className={`${inputClass} mt-7`} value={ownerId} onChange={(e) => setOwnerId(e.target.value)} placeholder="Owner username or email" required /><input className={`${inputClass} mt-3`} type="password" value={ownerPassword} onChange={(e) => setOwnerPassword(e.target.value)} placeholder="Password" required /><button className="mt-4 w-full rounded-xl bg-indigo-600 py-3 text-sm font-bold">Sign In</button><p className="mt-4 text-center text-[11px] text-slate-500">Demo owner: owner / admin123</p></form></main>;
 
-  if (!owner) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-slate-950 p-4 text-white">
-        <form onSubmit={handleOwnerLogin} className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-8">
-          <div className="mb-7 text-center">
-            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-indigo-600"><GraduationCap /></div>
-            <h1 className="mt-4 text-2xl font-black">Visioner Owner Portal</h1>
-            <p className="mt-1 text-xs text-slate-400">Manage every student record globally</p>
-          </div>
-          {loginError && <div className="mb-4 rounded-xl bg-rose-500/10 p-3 text-xs text-rose-300">{loginError}</div>}
-          <input className={`${inputClass} mb-3`} value={ownerId} onChange={(event) => setOwnerId(event.target.value)} placeholder="Owner username or email" required />
-          <input className={`${inputClass} mb-4`} type="password" value={ownerPassword} onChange={(event) => setOwnerPassword(event.target.value)} placeholder="Password" required />
-          <button className="w-full rounded-xl bg-indigo-600 py-3 text-sm font-bold">Sign In</button>
-          <p className="mt-4 text-center text-[11px] text-slate-500">Demo owner: owner / admin123</p>
-        </form>
-      </main>
-    );
-  }
+  return <main className="min-h-screen bg-slate-950 text-slate-100"><header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-950/95 backdrop-blur"><div className="mx-auto flex max-w-7xl items-center justify-between p-4"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-600"><GraduationCap size={20}/></div><div><b className="block text-sm">Visioner Virtual Academy</b><span className="text-[10px] text-indigo-400">OWNER PORTAL • GLOBAL DATA</span></div></div><div className="flex items-center gap-2"><button onClick={() => void refreshStudents()} className="rounded-xl bg-slate-800 p-2" title="Refresh"><RefreshCw size={15}/></button><button onClick={signOut} className="flex items-center gap-2 rounded-xl bg-slate-800 px-3 py-2 text-xs font-bold"><LogOut size={14}/>Sign Out</button></div></div></header>
+  <div className="mx-auto max-w-7xl space-y-5 p-4 sm:p-7"><section className="rounded-3xl border border-slate-800 bg-gradient-to-r from-slate-900 to-indigo-950/20 p-6"><p className="text-xs font-bold text-indigo-300">ACADEMY CONTROL CENTER</p><h1 className="mt-2 text-2xl font-black">Welcome, {owner.name}</h1><p className="mt-1 text-sm text-slate-400">Create and manage student data from one global Supabase source.</p></section>
+  <nav className="flex gap-2 overflow-x-auto pb-1">{tabs.map(([key,label,Icon]) => <button key={key} onClick={() => setTab(key)} className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold ${tab === key ? "bg-indigo-600 text-white" : "border border-slate-800 bg-slate-900 text-slate-400"}`}><Icon size={15}/>{label}</button>)}</nav>
+  <section className="rounded-2xl border border-slate-800 bg-slate-900 p-4"><div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div><p className="text-[10px] uppercase text-slate-500">Selected student</p><b>{selectedName}</b><p className="text-xs text-slate-500">{selectedId || "None"}</p></div><select value={selectedId} onChange={(e) => void loadStudent(e.target.value)} className="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm md:w-96"><option value="">Select student</option>{accounts.map((x) => <option key={x.studentId} value={x.studentId}>{x.studentName} • {x.studentId}</option>)}{applications.filter((app) => !accounts.some((x) => x.studentId === app.id || x.applicationId === app.id)).map((app) => <option key={app.id} value={app.id}>{app.studentName} • {app.id} (not activated)</option>)}</select></div></section>
 
-  const tabs: Array<[Tab, string, typeof Award]> = [
-    ["overview", "Overview", Award],
-    ["students", "Students", Users],
-    ["assignments", "Assignments", ClipboardList],
-    ["academic", "Subjects & Results", BookOpen],
-    ["timetable", "Timetable", CalendarDays],
-    ["attendance", "Attendance", CheckCircle2],
-  ];
+  {tab === "overview" && <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">{[["Students",stats.students,Users],["Enrollments",stats.enrollments,Users],["Assignments",stats.assignments,ClipboardList],["Average",`${stats.average}%`,Award],["Attendance",`${stats.attendance}%`,CheckCircle2]].map(([label,value,Icon]: any) => <div key={label} className="rounded-2xl border border-slate-800 bg-slate-900 p-5"><Icon size={18} className="text-indigo-400"/><p className="mt-4 text-xs text-slate-400">{label}</p><b className="mt-1 block text-2xl">{value}</b></div>)}</div>}
 
-  return (
-    <main className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="sticky top-0 z-20 border-b border-slate-800 bg-slate-950/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between p-4">
-          <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-600"><GraduationCap size={20} /></div>
-            <div><b className="block text-sm">Visioner Virtual Academy</b><span className="text-[10px] text-indigo-400">OWNER PORTAL • GLOBAL DATA</span></div>
-          </div>
-          <button onClick={signOut} className="flex items-center gap-2 rounded-xl bg-slate-800 px-3 py-2 text-xs font-bold"><LogOut size={14} /> Sign Out</button>
-        </div>
-      </header>
+  {tab === "enrollments" && <div className="space-y-3">{applications.length === 0 ? <Empty text="No enrollments found."/> : applications.map((app) => { const account = accounts.find((x) => x.applicationId === app.id || x.studentId === app.id); return <div key={app.id} className="rounded-2xl border border-slate-800 bg-slate-900 p-5"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div><b>{app.studentName}</b><p className="mt-1 text-xs text-slate-400">{app.id} • {app.studentEmail || "No email"}</p><p className="mt-1 text-xs text-slate-500">{app.targetTrack || "No track"} • {app.status || "Under Review"}</p></div><div className="flex flex-wrap gap-2"><button onClick={() => void loadStudent(account?.studentId || app.id)} className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold">Manage</button>{account ? <button onClick={() => { setSelectedId(account.studentId); setTab("credentials"); }} className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold">Credentials</button> : <button disabled={loading} onClick={() => void generateStudentAccount(app)} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold">Activate Student</button>}<button onClick={() => void deleteEnrollment(app)} disabled={loading} className="flex items-center gap-1 rounded-lg bg-rose-600/20 px-3 py-2 text-xs font-bold text-rose-300"><Trash2 size={13}/>Delete Enrollment</button></div></div></div>; })}</div>}
 
-      <div className="mx-auto max-w-7xl p-4 sm:p-7">
-        <section className="mb-5 flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 md:flex-row md:items-center md:justify-between">
-          <div><p className="text-[11px] text-slate-500">ACTIVE STUDENT</p><b>{selectedAccount?.studentName || selectedApplication?.studentName || "No student selected"}</b><p className="text-xs text-slate-500">{selectedId || "Select a student from the list"}</p></div>
-          <select value={selectedId} onChange={(event) => { const id = event.target.value; setSelectedId(id); if (id) void loadStudent(id, false); }} className="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm md:w-96">
-            <option value="">Select student</option>
-            {accounts.map((account) => <option key={account.studentId} value={account.studentId}>{account.studentName} • {account.studentId}</option>)}
-            {applications.filter((application) => !accounts.some((account) => account.applicationId === application.id)).map((application) => <option key={application.id} value={application.id}>{application.studentName} • no account</option>)}
-          </select>
-        </section>
+  {tab === "credentials" && <div className="grid gap-5 lg:grid-cols-[1fr,380px]">{selectedAccount ? <><div className="rounded-2xl border border-slate-800 bg-slate-900 p-6"><div className="flex items-center justify-between"><div><p className="text-xs text-indigo-300">STUDENT LOGIN CREDENTIALS</p><h2 className="mt-1 text-xl font-black">{selectedAccount.studentName}</h2></div><KeyRound className="text-indigo-400"/></div><div className="mt-6 grid gap-4 sm:grid-cols-2"><Credential label="Student ID / Username" value={selectedAccount.studentId}/><Credential label="Password" value={selectedAccount.password || "Not set"} secret/></div><div className="mt-5 flex flex-wrap gap-2"><button onClick={() => void copyCredentials()} className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold"><Copy size={14}/>Copy Credentials</button><button onClick={() => void regeneratePassword()} className="flex items-center gap-2 rounded-xl bg-slate-800 px-4 py-2.5 text-xs font-bold"><KeyRound size={14}/>Generate New Password</button></div><p className="mt-5 text-xs text-slate-500">This is the password currently stored for the student login.</p></div><div className="rounded-2xl border border-slate-800 bg-slate-900 p-6"><p className="text-xs text-slate-500">ACCOUNT DETAILS</p><div className="mt-4 space-y-3 text-sm"><p><span className="text-slate-500">Name:</span> {selectedAccount.studentName}</p><p><span className="text-slate-500">Email:</span> {selectedAccount.studentEmail || "—"}</p><p><span className="text-slate-500">Application:</span> {selectedAccount.applicationId}</p><p><span className="text-slate-500">Created:</span> {selectedAccount.createdAt ? new Date(selectedAccount.createdAt).toLocaleString() : "—"}</p></div></div></> : <Empty text="Select an activated student to view credentials."/>}</div>}
 
-        <nav className="mb-6 flex gap-2 overflow-x-auto">
-          {tabs.map(([key, label, Icon]) => (
-            <button key={key} onClick={() => setTab(key)} className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold ${tab === key ? "bg-indigo-600 text-white" : "border border-slate-800 bg-slate-900 text-slate-400"}`}><Icon size={15} />{label}</button>
-          ))}
-        </nav>
+  {tab === "assignments" && <div className="grid gap-5 lg:grid-cols-[360px,1fr]"><form onSubmit={saveAssignment} className="rounded-2xl border border-slate-800 bg-slate-900 p-5"><h2 className="font-bold">{assignment.id ? "Edit Assignment" : "Publish Assignment"}</h2><input className={`${inputClass} mt-4`} placeholder="Title" value={assignment.title} onChange={(e) => setAssignment({...assignment,title:e.target.value})} required/><input className={`${inputClass} mt-2`} placeholder="Subject / course" value={assignment.course} onChange={(e) => setAssignment({...assignment,course:e.target.value})} required/><input className={`${inputClass} mt-2`} placeholder="Course code" value={assignment.courseCode} onChange={(e) => setAssignment({...assignment,courseCode:e.target.value})}/><input className={`${inputClass} mt-2`} placeholder="Due date" value={assignment.dueDate} onChange={(e) => setAssignment({...assignment,dueDate:e.target.value})}/><textarea className={`${inputClass} mt-2 min-h-24`} placeholder="Instructions" value={assignment.instructions} onChange={(e) => setAssignment({...assignment,instructions:e.target.value})}/><select className={`${inputClass} mt-2`} value={assignment.urgency} onChange={(e) => setAssignment({...assignment,urgency:e.target.value})}><option value="normal">Normal</option><option value="high">High</option></select><button disabled={!selectedId} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 text-xs font-bold"><Save size={14}/>Save Assignment</button></form><div className="space-y-3">{assignments.length ? assignments.map((item) => <div key={item.id} className="rounded-2xl border border-slate-800 bg-slate-900 p-5"><div className="flex justify-between gap-3"><div><b>{item.title}</b><p className="mt-1 text-xs text-slate-500">{item.course} • Due {item.dueDate || "—"}</p></div><span className="text-[10px] font-bold uppercase text-indigo-300">{item.status}</span></div><div className="mt-4 flex flex-wrap gap-2"><button onClick={() => setAssignment(item)} className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold"><Pencil size={13} className="inline"/> Edit</button><button onClick={() => void gradeAssignment(item)} className="rounded-lg bg-emerald-600/20 px-3 py-2 text-xs font-bold text-emerald-300">Grade</button><button onClick={() => void deleteAssignment(item.id)} className="rounded-lg bg-rose-600/20 px-3 py-2 text-xs font-bold text-rose-300"><Trash2 size={13} className="inline"/> Delete</button></div></div>) : <Empty text="No assignments for this student."/>}</div></div>}
 
-        {!selectedId && <div className="rounded-2xl border border-slate-800 bg-slate-900 p-10 text-center text-sm text-slate-400">Select a student to manage their academic portal.</div>}
-        {selectedId && !records && <div className="rounded-2xl border border-slate-800 bg-slate-900 p-10 text-center text-sm text-slate-400">Loading student data...</div>}
+  {tab === "academic" && <div className="grid gap-5 lg:grid-cols-2"><div className="rounded-2xl border border-slate-800 bg-slate-900 p-5"><h2 className="font-bold">Subjects</h2><div className="mt-4 flex gap-2"><input className={inputClass} placeholder="Subject" value={subjectName} onChange={(e)=>setSubjectName(e.target.value)}/><input className={inputClass} placeholder="Code" value={subjectCode} onChange={(e)=>setSubjectCode(e.target.value)}/><button onClick={() => void addSubject()} className="rounded-xl bg-indigo-600 px-4"><Plus size={16}/></button></div><div className="mt-4 space-y-2">{(records?.subjects || []).map((s) => <div key={s} className="flex items-center justify-between rounded-xl bg-slate-950 p-3 text-sm"><span>{s}</span><button onClick={()=>void deleteSubject(s)} className="text-rose-300"><Trash2 size={14}/></button></div>)}</div></div><div className="rounded-2xl border border-slate-800 bg-slate-900 p-5"><h2 className="font-bold">Results</h2><form onSubmit={saveResult} className="mt-4 grid gap-2 sm:grid-cols-2"><input className={inputClass} placeholder="Subject" value={result.course} onChange={(e)=>setResult({...result,course:e.target.value})} required/><input className={inputClass} placeholder="Code" value={result.code} onChange={(e)=>setResult({...result,code:e.target.value})}/><input className={inputClass} placeholder="Score e.g. 94%" value={result.score} onChange={(e)=>setResult({...result,score:e.target.value})} required/><input className={inputClass} placeholder="Grade e.g. A" value={result.grade} onChange={(e)=>setResult({...result,grade:e.target.value})}/><input className={`${inputClass} sm:col-span-2`} placeholder="Feedback" value={result.feedback} onChange={(e)=>setResult({...result,feedback:e.target.value})}/><button disabled={!selectedId} className="rounded-xl bg-indigo-600 py-3 text-xs font-bold sm:col-span-2">{editingResult ? "Update Result" : "Publish Result"}</button></form><div className="mt-4 space-y-2">{(records?.results || []).map((r)=><div key={r.id} className="flex items-center justify-between rounded-xl bg-slate-950 p-3"><div><b className="text-sm">{r.course}</b><p className="text-xs text-slate-500">{r.code || ""} • {r.grade || ""}</p></div><div className="flex items-center gap-2"><strong>{r.score}</strong><button onClick={()=>{setResult(r);setEditingResult(r.id)}}><Pencil size={14}/></button><button onClick={()=>void deleteResult(r.id)} className="text-rose-300"><Trash2 size={14}/></button></div></div>)}</div></div></div>}
 
-        {records && tab === "overview" && <Overview average={average} attendance={attendancePercentage} assignments={assignments} subjects={subjects} />}
-        {records && tab === "students" && <StudentsTab applications={applications} accounts={accounts} onGenerate={generateStudentAccount} onOpen={(id) => { setSelectedId(id); void loadStudent(id, false); }} />}
-        {records && tab === "assignments" && <AssignmentsTab assignment={assignment} assignments={assignments} onChange={setAssignment} onSubmit={submitAssignment} onEdit={setAssignment} onGrade={gradeAssignment} onDelete={deleteAssignment} />}
-        {records && tab === "academic" && <AcademicTab records={records} subjects={subjects} subjectName={subjectName} subjectCode={subjectCode} result={result} editingResult={editingResult} onSubjectName={setSubjectName} onSubjectCode={setSubjectCode} onAddSubject={addSubject} onDeleteSubject={deleteSubject} onResult={setResult} onSubmitResult={saveResult} onEditResult={(item) => { setResult(item); setEditingResult(item.id); }} onDeleteResult={deleteResult} />}
-        {records && tab === "timetable" && <TimetableTab records={records} schedule={schedule} editingSchedule={editingSchedule} onSchedule={setSchedule} onSubmit={saveSchedule} onEdit={(item) => { setSchedule(item); setEditingSchedule(String(item.id)); }} onDelete={deleteSchedule} />}
-        {records && tab === "attendance" && <AttendanceTab records={records} attendance={attendance} editingAttendance={editingAttendance} onAttendance={setAttendance} onSubmit={saveAttendance} onEdit={(item) => { setAttendance(item); setEditingAttendance(item.id); }} onDelete={deleteAttendance} />}
-      </div>
+  {tab === "timetable" && <div className="grid gap-5 lg:grid-cols-[360px,1fr]"><form onSubmit={saveSchedule} className="rounded-2xl border border-slate-800 bg-slate-900 p-5"><h2 className="font-bold">{editingSchedule ? "Edit Timetable" : "Publish Timetable"}</h2><select className={`${inputClass} mt-4`} value={schedule.day} onChange={(e)=>setSchedule({...schedule,day:e.target.value})}>{["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].map((d)=><option key={d}>{d}</option>)}</select><input className={`${inputClass} mt-2`} placeholder="Time" value={schedule.time} onChange={(e)=>setSchedule({...schedule,time:e.target.value})} required/><input className={`${inputClass} mt-2`} placeholder="Subject" value={schedule.subject} onChange={(e)=>setSchedule({...schedule,subject:e.target.value})} required/><input className={`${inputClass} mt-2`} placeholder="Teacher" value={schedule.teacher} onChange={(e)=>setSchedule({...schedule,teacher:e.target.value})}/><input className={`${inputClass} mt-2`} placeholder="Room / Link" value={schedule.room} onChange={(e)=>setSchedule({...schedule,room:e.target.value})}/><button disabled={!selectedId} className="mt-3 w-full rounded-xl bg-indigo-600 py-3 text-xs font-bold">Save Timetable</button></form><div className="space-y-2">{(records?.schedule || []).map((s)=><div key={s.id} className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900 p-4"><div><b>{s.subject}</b><p className="text-xs text-slate-500">{s.day} • {s.time} • {s.teacher || ""}</p></div><div className="flex gap-2"><button onClick={()=>{setSchedule(s);setEditingSchedule(String(s.id))}}><Pencil size={14}/></button><button onClick={()=>void deleteSchedule(String(s.id))} className="text-rose-300"><Trash2 size={14}/></button></div></div>)}{!(records?.schedule || []).length && <Empty text="No timetable entries."/>}</div></div>}
 
-      {message && <div className="fixed bottom-5 right-5 rounded-xl border border-emerald-500/30 bg-emerald-950 px-4 py-3 text-xs text-emerald-300 shadow-xl">{message}</div>}
-    </main>
-  );
+  {tab === "attendance" && <div className="grid gap-5 lg:grid-cols-[360px,1fr]"><form onSubmit={saveAttendance} className="rounded-2xl border border-slate-800 bg-slate-900 p-5"><h2 className="font-bold">{editingAttendance ? "Edit Attendance" : "Record Attendance"}</h2><input className={`${inputClass} mt-4`} type="date" value={attendance.date} onChange={(e)=>setAttendance({...attendance,date:e.target.value})} required/><input className={`${inputClass} mt-2`} placeholder="Subject" value={attendance.course} onChange={(e)=>setAttendance({...attendance,course:e.target.value})} required/><select className={`${inputClass} mt-2`} value={attendance.status} onChange={(e)=>setAttendance({...attendance,status:e.target.value})}><option>Present</option><option>Absent</option><option>Late</option><option>Leave</option></select><div className="mt-2 grid grid-cols-2 gap-2"><input className={inputClass} type="number" min="1" placeholder="Total classes" value={attendance.totalClasses} onChange={(e)=>setAttendance({...attendance,totalClasses:Number(e.target.value)})}/><input className={inputClass} type="number" min="0" placeholder="Attended" value={attendance.attended} onChange={(e)=>setAttendance({...attendance,attended:Number(e.target.value)})}/></div><button disabled={!selectedId} className="mt-3 w-full rounded-xl bg-indigo-600 py-3 text-xs font-bold">Save Attendance</button></form><div className="space-y-2">{(records?.attendance || []).map((a)=><div key={a.id} className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900 p-4"><div><b>{a.course}</b><p className="text-xs text-slate-500">{a.date} • {a.status} • {a.percentage}</p></div><div className="flex gap-2"><button onClick={()=>{setAttendance(a);setEditingAttendance(a.id)}}><Pencil size={14}/></button><button onClick={()=>void deleteAttendance(a.id)} className="text-rose-300"><Trash2 size={14}/></button></div></div>)}{!(records?.attendance || []).length && <Empty text="No attendance records."/>}</div></div>}
+
+  {message && <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-emerald-500/30 bg-emerald-950 px-4 py-3 text-xs text-emerald-300 shadow-xl">{message}</div>}
+  </div></main>;
 }
 
-function calculateAverage(results: AcademicResult[]) {
-  if (!results.length) return 0;
-  const values = results.map((result) => Number.parseFloat(String(result.score || "").replace(/[^0-9.]/g, "")) || 0);
-  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
-}
-
-function calculateAttendance(records: AttendanceRecord[]) {
-  if (!records.length) return 0;
-  const total = records.reduce((sum, item) => sum + Number(item.totalClasses || 1), 0);
-  const attended = records.reduce((sum, item) => sum + Number(item.attended || 0), 0);
-  return total ? Math.round((attended / total) * 100) : 0;
-}
-
-function Overview({ average, attendance, assignments, subjects }: { average: number; attendance: number; assignments: Assignment[]; subjects: string[] }) {
-  const cards = [["Average Result", `${average}%`, Award], ["Pending Assignments", assignments.filter((item) => item.status === "pending").length, ClipboardList], ["Attendance", `${attendance}%`, CheckCircle2], ["Active Subjects", subjects.length, BookOpen]] as const;
-  return <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{cards.map(([label, value, Icon]) => <div key={label} className="rounded-2xl border border-slate-800 bg-slate-900 p-5"><Icon size={18} className="text-indigo-400" /><p className="mt-4 text-xs text-slate-500">{label}</p><b className="mt-1 block text-2xl">{value}</b></div>)}</div>;
-}
-
-function StudentsTab({ applications, accounts, onGenerate, onOpen }: { applications: AdmissionsApplication[]; accounts: StudentAccount[]; onGenerate: (application: AdmissionsApplication) => void; onOpen: (id: string) => void }) {
-  return <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5"><h2 className="font-bold">Student accounts</h2><div className="mt-4 grid gap-3">{applications.map((application) => { const account = accounts.find((item) => item.applicationId === application.id || item.studentId === application.id); return <div key={application.id} className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-950 p-4 md:flex-row md:items-center md:justify-between"><div><b>{application.studentName}</b><p className="text-xs text-slate-500">{application.studentEmail} • {application.id}</p></div>{account ? <button onClick={() => onOpen(account.studentId)} className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold">Open Portal Data</button> : <button onClick={() => void onGenerate(application)} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold">Generate Account</button>}</div>; })}</div></div>;
-}
-
-function AssignmentsTab({ assignment, assignments, onChange, onSubmit, onEdit, onGrade, onDelete }: { assignment: Assignment; assignments: Assignment[]; onChange: (value: Assignment) => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void; onEdit: (value: Assignment) => void; onGrade: (value: Assignment) => void; onDelete: (id: string) => void }) {
-  return <div className="grid gap-5 lg:grid-cols-[380px,1fr]"><form onSubmit={onSubmit} className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900 p-5"><h2 className="font-bold">{assignment.id ? "Edit" : "Create"} assignment</h2><input className={inputClass} value={assignment.title} onChange={(e) => onChange({ ...assignment, title: e.target.value })} placeholder="Assignment title" required /><input className={inputClass} value={assignment.course} onChange={(e) => onChange({ ...assignment, course: e.target.value })} placeholder="Subject / course" required /><input className={inputClass} value={assignment.courseCode || ""} onChange={(e) => onChange({ ...assignment, courseCode: e.target.value })} placeholder="Subject code" /><input className={inputClass} type="date" value={assignment.dueDate} onChange={(e) => onChange({ ...assignment, dueDate: e.target.value })} /><input className={inputClass} value={assignment.score || ""} onChange={(e) => onChange({ ...assignment, score: e.target.value })} placeholder="Marks e.g. 100 pts" /><select className={inputClass} value={assignment.urgency || "normal"} onChange={(e) => onChange({ ...assignment, urgency: e.target.value })}><option value="normal">Normal</option><option value="high">High priority</option></select><textarea className={`${inputClass} min-h-28`} value={assignment.instructions || ""} onChange={(e) => onChange({ ...assignment, instructions: e.target.value })} placeholder="Instructions" /><button className="w-full rounded-xl bg-indigo-600 py-3 text-xs font-bold"><Save size={14} className="mr-1 inline" />{assignment.id ? "Update" : "Publish"}</button></form><div className="space-y-3">{assignments.map((item) => <div key={item.id} className="rounded-2xl border border-slate-800 bg-slate-900 p-5"><div className="flex justify-between gap-3"><div><b>{item.title}</b><p className="mt-1 text-xs text-slate-500">{item.course} • Due {item.dueDate || "—"}</p></div><span className="text-[10px] uppercase text-indigo-300">{item.status}</span></div>{item.instructions && <p className="mt-3 text-xs text-slate-400">{item.instructions}</p>}{item.score && <p className="mt-2 text-xs text-emerald-300">Score: {item.score}{item.feedback ? ` • ${item.feedback}` : ""}</p>}{item.submissionNotes && <p className="mt-2 text-xs text-slate-500">Submission: {item.submissionNotes}</p>}<div className="mt-4 flex flex-wrap gap-2"><button onClick={() => onEdit(item)} className="rounded-lg bg-slate-800 px-3 py-2 text-xs">Edit</button><button onClick={() => void onGrade(item)} className="rounded-lg bg-indigo-600 px-3 py-2 text-xs">Grade</button><button onClick={() => void onDelete(item.id)} className="rounded-lg bg-rose-600/80 px-3 py-2 text-xs">Delete</button></div></div>)}{!assignments.length && <div className="rounded-2xl border border-slate-800 bg-slate-900 p-8 text-sm text-slate-500">No assignments published for this student.</div>}</div></div>;
-}
-
-function AcademicTab({ records, subjects, subjectName, subjectCode, result, editingResult, onSubjectName, onSubjectCode, onAddSubject, onDeleteSubject, onResult, onSubmitResult, onEditResult, onDeleteResult }: { records: PortalRecords; subjects: string[]; subjectName: string; subjectCode: string; result: AcademicResult; editingResult: string | null; onSubjectName: (value: string) => void; onSubjectCode: (value: string) => void; onAddSubject: () => void; onDeleteSubject: (value: string) => void; onResult: (value: AcademicResult) => void; onSubmitResult: (event: FormEvent<HTMLFormElement>) => void; onEditResult: (value: AcademicResult) => void; onDeleteResult: (id: string) => void }) {
-  return <div className="space-y-5"><section className="rounded-2xl border border-slate-800 bg-slate-900 p-5"><h2 className="font-bold">Subjects</h2><div className="mt-3 flex flex-col gap-2 md:flex-row"><input className={inputClass} value={subjectName} onChange={(e) => onSubjectName(e.target.value)} placeholder="Subject name" /><input className={inputClass} value={subjectCode} onChange={(e) => onSubjectCode(e.target.value)} placeholder="Code" /><button type="button" onClick={onAddSubject} className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-bold"><Plus size={14} className="mr-1 inline" />Add</button></div><div className="mt-4 flex flex-wrap gap-2">{subjects.map((subject) => <span key={subject} className="flex items-center gap-2 rounded-full bg-slate-950 px-3 py-2 text-xs">{subject}<button type="button" onClick={() => void onDeleteSubject(subject)}><Trash2 size={12} /></button></span>)}</div></section><div className="grid gap-5 lg:grid-cols-[380px,1fr]"><form onSubmit={onSubmitResult} className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900 p-5"><h2 className="font-bold">{editingResult ? "Edit" : "Add"} result</h2><input className={inputClass} value={result.course || ""} onChange={(e) => onResult({ ...result, course: e.target.value, subject: e.target.value })} placeholder="Subject" required /><input className={inputClass} value={result.code || ""} onChange={(e) => onResult({ ...result, code: e.target.value })} placeholder="Subject code" /><input className={inputClass} value={result.score || ""} onChange={(e) => onResult({ ...result, score: e.target.value })} placeholder="Score e.g. 94 / 100" required /><input className={inputClass} value={result.grade || ""} onChange={(e) => onResult({ ...result, grade: e.target.value })} placeholder="Grade e.g. A" /><textarea className={inputClass} value={result.feedback || ""} onChange={(e) => onResult({ ...result, feedback: e.target.value })} placeholder="Feedback" /><button className="w-full rounded-xl bg-indigo-600 py-3 text-xs font-bold"><Save size={14} className="mr-1 inline" />{editingResult ? "Update result" : "Publish result"}</button></form><div className="space-y-3">{records.results.map((item) => <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900 p-4"><div><b>{item.course || item.subject}</b><p className="text-xs text-slate-500">{item.code || ""}{item.feedback ? ` • ${item.feedback}` : ""}</p></div><div className="flex items-center gap-2"><strong className="text-indigo-300">{item.score || item.grade}</strong><button type="button" onClick={() => onEditResult(item)} className="rounded-lg bg-slate-800 p-2"><Save size={13} /></button><button type="button" onClick={() => void onDeleteResult(item.id)} className="rounded-lg bg-rose-600/80 p-2"><Trash2 size={13} /></button></div></div>)}{!records.results.length && <div className="rounded-2xl border border-slate-800 bg-slate-900 p-8 text-sm text-slate-500">No results published yet.</div>}</div></div></div>;
-}
-
-function TimetableTab({ records, schedule, editingSchedule, onSchedule, onSubmit, onEdit, onDelete }: { records: PortalRecords; schedule: ScheduleRecord; editingSchedule: string | null; onSchedule: (value: ScheduleRecord) => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void; onEdit: (value: ScheduleRecord) => void; onDelete: (id: string) => void }) {
-  return <div className="grid gap-5 lg:grid-cols-[380px,1fr]"><form onSubmit={onSubmit} className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900 p-5"><h2 className="font-bold">{editingSchedule ? "Edit" : "Add"} timetable class</h2><select className={inputClass} value={schedule.day || "Monday"} onChange={(e) => onSchedule({ ...schedule, day: e.target.value })}>{["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day) => <option key={day}>{day}</option>)}</select><input className={inputClass} value={schedule.time || ""} onChange={(e) => onSchedule({ ...schedule, time: e.target.value })} placeholder="09:00 AM - 10:30 AM" required /><input className={inputClass} value={schedule.subject || ""} onChange={(e) => onSchedule({ ...schedule, subject: e.target.value })} placeholder="Subject" required /><input className={inputClass} value={schedule.teacher || ""} onChange={(e) => onSchedule({ ...schedule, teacher: e.target.value })} placeholder="Teacher" /><input className={inputClass} value={schedule.room || ""} onChange={(e) => onSchedule({ ...schedule, room: e.target.value })} placeholder="Room / online link" /><button className="w-full rounded-xl bg-indigo-600 py-3 text-xs font-bold"><Save size={14} className="mr-1 inline" />{editingSchedule ? "Update" : "Publish"}</button></form><div className="space-y-3">{records.schedule.map((item) => <div key={String(item.id)} className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900 p-4"><div><b>{item.day} • {item.time}</b><p className="mt-1 text-xs text-indigo-300">{item.subject || item.course}</p><p className="text-xs text-slate-500">{item.teacher || "Faculty"}{item.room ? ` • ${item.room}` : ""}</p></div><div className="flex gap-2"><button type="button" onClick={() => onEdit(item)} className="rounded-lg bg-slate-800 px-3 py-2 text-xs">Edit</button><button type="button" onClick={() => void onDelete(String(item.id))} className="rounded-lg bg-rose-600/80 px-3 py-2 text-xs">Delete</button></div></div>)}{!records.schedule.length && <div className="rounded-2xl border border-slate-800 bg-slate-900 p-8 text-sm text-slate-500">No timetable classes published yet.</div>}</div></div>;
-}
-
-function AttendanceTab({ records, attendance, editingAttendance, onAttendance, onSubmit, onEdit, onDelete }: { records: PortalRecords; attendance: AttendanceRecord; editingAttendance: string | null; onAttendance: (value: AttendanceRecord) => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void; onEdit: (value: AttendanceRecord) => void; onDelete: (id: string) => void }) {
-  return <div className="grid gap-5 lg:grid-cols-[380px,1fr]"><form onSubmit={onSubmit} className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900 p-5"><h2 className="font-bold">{editingAttendance ? "Edit" : "Add"} attendance</h2><input className={inputClass} type="date" value={attendance.date || ""} onChange={(e) => onAttendance({ ...attendance, date: e.target.value })} required /><input className={inputClass} value={attendance.course || ""} onChange={(e) => onAttendance({ ...attendance, course: e.target.value, subject: e.target.value })} placeholder="Subject" required /><select className={inputClass} value={attendance.status || "Present"} onChange={(e) => onAttendance({ ...attendance, status: e.target.value })}><option>Present</option><option>Absent</option><option>Late</option><option>Leave</option></select><div className="grid grid-cols-2 gap-2"><input className={inputClass} type="number" min="1" value={attendance.totalClasses ?? 1} onChange={(e) => onAttendance({ ...attendance, totalClasses: Number(e.target.value) })} placeholder="Total classes" /><input className={inputClass} type="number" min="0" value={attendance.attended ?? 0} onChange={(e) => onAttendance({ ...attendance, attended: Number(e.target.value) })} placeholder="Attended" /></div><button className="w-full rounded-xl bg-indigo-600 py-3 text-xs font-bold"><Save size={14} className="mr-1 inline" />{editingAttendance ? "Update" : "Save"}</button></form><div className="space-y-3">{records.attendance.map((item) => <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900 p-4"><div><b>{item.course || item.subject}</b><p className="text-xs text-slate-500">{item.date} • {item.percentage || `${item.attended || 0}/${item.totalClasses || 0}`}</p></div><div className="flex items-center gap-2"><span className="text-xs text-emerald-300">{item.status}</span><button type="button" onClick={() => onEdit(item)} className="rounded-lg bg-slate-800 p-2"><Save size={13} /></button><button type="button" onClick={() => void onDelete(item.id)} className="rounded-lg bg-rose-600/80 p-2"><Trash2 size={13} /></button></div></div>)}{!records.attendance.length && <div className="rounded-2xl border border-slate-800 bg-slate-900 p-8 text-sm text-slate-500">No attendance records published yet.</div>}</div></div>;
-}
+function Empty({ text }: { text: string }) { return <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900 p-8 text-center text-sm text-slate-500">{text}</div>; }
+function Credential({ label, value, secret = false }: { label: string; value: string; secret?: boolean }) { return <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4"><p className="text-[10px] uppercase text-slate-500">{label}</p><p className={`mt-2 break-all font-mono text-sm ${secret ? "text-amber-300" : "text-indigo-300"}`}>{value}</p></div>; }
