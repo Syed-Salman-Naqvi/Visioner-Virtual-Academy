@@ -18,6 +18,11 @@ export const metadata: Metadata = {
   title: "Visioners Virtual Academy | Premier Online Global Education",
   description:
     "Accredited international online school offering Cambridge IGCSE, A-Levels, AP & IB courses with live interactive classrooms for students worldwide.",
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({
