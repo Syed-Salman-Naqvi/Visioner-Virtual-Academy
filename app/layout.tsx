@@ -42,7 +42,7 @@ export default function RootLayout({
           id="metricool-tracking"
           strategy="afterInteractive"
           dangerouslySetInnerHTML={{
-            __html: `(function(){function loadScript(a){var b=document.getElementsByTagName("head")[0],c=document.createElement("script");c.type="text/javascript";c.src="https://tracker.metricool.com/resources/be.js";c.onreadystatechange=a;c.onload=a;b.appendChild(c)}loadScript(function(){if(window.beTracker){window.beTracker.t({hash:"aba05fc9cfb2c262b58429d18658b8d3"})}})})();`,
+            __html: `function loadScript(a){var b=document.getElementsByTagName("head")[0],c=document.createElement("script");c.type="text/javascript",c.src="https://tracker.metricool.com/resources/be.js",c.onreadystatechange=a,c.onload=a,b.appendChild(c)}loadScript(function(){beTracker.t({hash:"aba05fc9cfb2c262b58429d18658b8d3"})});`,
           }}
         />
       </body>
