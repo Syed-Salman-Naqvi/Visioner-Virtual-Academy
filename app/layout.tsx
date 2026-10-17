@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import BrandNameReplacer from "@/components/BrandNameReplacer";
 
@@ -32,8 +33,14 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col antialiased" style={{background:"#0D1F5C", color:"#F0F4FF"}}>
         <BrandNameReplacer />
         {children}
+        <Script
+          id="metricool-tracking"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `(function(){function loadScript(a){var b=document.getElementsByTagName("head")[0],c=document.createElement("script");c.type="text/javascript";c.src="https://tracker.metricool.com/resources/be.js";c.onreadystatechange=a;c.onload=a;b.appendChild(c)}loadScript(function(){if(window.beTracker){window.beTracker.t({hash:"aba05fc9cfb2c262b58429d18658b8d3"})}})})();`,
+          }}
+        />
       </body>
     </html>
   );
 }
-
