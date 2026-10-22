@@ -34,7 +34,7 @@ export async function saveApplication(app: AdmissionsApplication): Promise<void>
     nationality: app.nationality, country_of_residence: app.countryOfResidence, city: app.city, parent_name: app.parentName, parent_email: app.parentEmail, parent_phone: app.parentPhone,
     target_track: app.targetTrack, grade_level: app.gradeLevel, time_zone: app.timeZone, preferred_cohort_slot: app.preferredCohortSlot, assigned_advisor: app.assignedAdvisor,
     documents_attached: app.documentsAttached, statement_of_purpose: app.statementOfPurpose });
-  if (error) console.error("Supabase application save error:", error);
+  if (error) throw new Error(`Could not save enrollment status to Supabase: ${error.message}`);
 }
 
 export async function deleteApplication(id: string): Promise<void> {
