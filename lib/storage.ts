@@ -1,6 +1,5 @@
 import { supabase } from "./supabase";
 import { AdmissionsApplication, StudentAccount, Assignment } from "./types";
-import { mockApplications } from "./mockData";
 
 export async function getSavedApplications(): Promise<AdmissionsApplication[]> {
   let localApps: AdmissionsApplication[] = [];
@@ -21,14 +20,14 @@ export async function getSavedApplications(): Promise<AdmissionsApplication[]> {
     }));
   } catch (error) { console.error("Cloud applications read error:", error); }
   const map = new Map<string, AdmissionsApplication>();
-  [...mockApplications, ...localApps, ...dbApps].forEach((app) => app?.id && map.set(app.id.trim().toUpperCase(), app));
+  [...localApps, ...dbApps].forEach((app) => app?.id && map.set(app.id.trim().toUpperCase(), app));
   return [...map.values()];
 }
 
 export async function saveApplication(app: AdmissionsApplication): Promise<void> {
   if (!app) return;
   if (typeof window !== "undefined") {
-    try { const old = localStorage.getItem("vva_admissions_apps"); const list = old ? JSON.parse(old) : mockApplications; localStorage.setItem("vva_admissions_apps", JSON.stringify([app, ...list.filter((i: any) => i.id !== app.id)])); } catch {}
+    try { const old = localStorage.getItem("vva_admissions_apps"); const list = old ? JSON.parse(old) : []; localStorage.setItem("vva_admissions_apps", JSON.stringify([app, ...list.filter((i: any) => i.id !== app.id)])); } catch {}
   }
   const { error } = await supabase.from("applications").upsert({ id: app.id, created_at: app.createdAt, status: app.status, student_name: app.studentName, student_email: app.studentEmail, date_of_birth: app.dateOfBirth,
     nationality: app.nationality, country_of_residence: app.countryOfResidence, city: app.city, parent_name: app.parentName, parent_email: app.parentEmail, parent_phone: app.parentPhone,
@@ -46,7 +45,7 @@ export async function deleteApplication(id: string): Promise<void> {
     } catch {}
   }
   const { error } = await supabase.from("applications").delete().eq("id", cleanId);
-  if (error) console.error("Supabase application delete error:", error);
+  if (error) throw new Error(`Could not delete enrollment from Supabase: ${error.message}`);
 }
 
 export async function findApplicationById(id: string): Promise<AdmissionsApplication | null> { return (await getSavedApplications()).find((x) => x.id.toUpperCase() === id.trim().toUpperCase()) || null; }
@@ -77,8 +76,8 @@ export async function saveStudentAccount(account: StudentAccount): Promise<void>
 export async function deleteStudentAccount(studentId: string): Promise<void> {
   const id = studentId.trim();
   if (typeof window !== "undefined") try { const raw = localStorage.getItem("vva_student_accounts"); if (raw) localStorage.setItem("vva_student_accounts", JSON.stringify(JSON.parse(raw).filter((x: any) => x.studentId?.toUpperCase() !== id.toUpperCase() && x.applicationId?.toUpperCase() !== id.toUpperCase()))); } catch {}
-  const { error } = await supabase.from("student_accounts").delete().eq("student_id", id);
-  if (error) console.error("Supabase account delete error:", error);
+  const { error } = await supabase.from("student_accounts").delete().or(`student_id.eq.${id},id.eq.${id},application_id.eq.${id}`);
+  if (error) throw new Error(`Could not delete student account from Supabase: ${error.message}`);
 }
 
 export async function deleteStudentAssignments(studentId: string): Promise<void> {
@@ -86,7 +85,7 @@ export async function deleteStudentAssignments(studentId: string): Promise<void>
   if (!id) return;
   if (typeof window !== "undefined") localStorage.removeItem(`vva_assignments_${id}`);
   const { error } = await supabase.from("assignments").delete().eq("student_id", id);
-  if (error) console.error("Supabase assignment cleanup error:", error);
+  if (error) throw new Error(`Could not delete student assignments from Supabase: ${error.message}`);
 }
 
 export async function getStudentAssignments(studentId: string, defaultList: Assignment[] = []): Promise<Assignment[]> {
