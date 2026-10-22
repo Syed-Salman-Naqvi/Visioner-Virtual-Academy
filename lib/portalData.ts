@@ -82,7 +82,7 @@ export async function deleteStudentPortalRecords(studentId: string): Promise<voi
     } catch {}
   }
   const { error } = await supabase.from('portal_records').delete().eq('student_id', cleanId);
-  if (error) console.error('Supabase portal record cleanup error:', error);
+  if (error) throw new Error(`Could not delete student portal records from Supabase: ${error.message}`);
 }
 
 export async function migrateStudentPortalRecords(studentId: string, targetStudentId?: string): Promise<PortalRecords> {
