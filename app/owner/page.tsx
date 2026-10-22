@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Award, BookOpen, CalendarDays, CheckCircle2, ClipboardList, Copy, GraduationCap, KeyRound, LogOut, Pencil, Plus, RefreshCw, Save, Trash2, Users } from "lucide-react";
 import { clearPortalSession, getPortalSession, loginOwner, savePortalSession, PortalUser } from "@/lib/auth";
-import { deleteApplication, deleteStudentAccount, deleteStudentAssignments, getSavedApplications, getStudentAccounts, getStudentAssignments, saveStudentAccount, saveStudentAssignments } from "@/lib/storage";
+import { deleteApplication, deleteStudentAccount, deleteStudentAssignments, getSavedApplications, getStudentAccounts, getStudentAssignments, saveApplication, saveStudentAccount, saveStudentAssignments } from "@/lib/storage";
 import { AdmissionsApplication, Assignment, StudentAccount } from "@/lib/types";
 import { AcademicResult, AttendanceRecord, PortalRecords, ScheduleRecord, deleteStudentPortalRecords, getStudentPortalRecords, saveStudentPortalRecords } from "@/lib/portalData";
 
@@ -56,9 +56,46 @@ export default function OwnerPage() {
   function signOut() { clearPortalSession(); setOwner(null); setSelectedId(""); setRecords(null); setAssignments([]); }
 
   async function generateStudentAccount(application: AdmissionsApplication) {
-    setLoading(true); try { const existing = accounts.find((x) => x.applicationId === application.id || x.studentId === application.id); const account: StudentAccount = existing || { applicationId: application.id, studentId: application.id, password: makePassword(), studentName: application.studentName, studentEmail: application.studentEmail, createdAt: new Date().toISOString() }; await saveStudentAccount(account); await refreshStudents(account.studentId); setTab("credentials"); notify("Student credentials saved globally."); } finally { setLoading(false); }
+    setLoading(true);
+    try {
+      const existing = accounts.find((x) => x.applicationId === application.id || x.studentId === application.id);
+      const account: StudentAccount = existing || {
+        applicationId: application.id,
+        studentId: application.id,
+        password: makePassword(),
+        studentName: application.studentName,
+        studentEmail: application.studentEmail,
+        createdAt: new Date().toISOString(),
+      };
+      await saveStudentAccount(account);
+      if (application.status !== "Accepted") {
+        await saveApplication({ ...application, status: "Accepted" });
+      }
+      await refreshStudents(account.studentId);
+      setTab("credentials");
+      notify("Student accepted. Credentials are saved in Supabase and ready for login.");
+    } catch (error) {
+      console.error("Student activation failed:", error);
+      notify(error instanceof Error ? error.message : "Could not activate student. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
-  async function regeneratePassword() { if (!selectedAccount) return; const account = { ...selectedAccount, password: makePassword() }; await saveStudentAccount(account); await refreshStudents(account.studentId); notify("New student password saved to Supabase."); }
+  async function regeneratePassword() {
+    if (!selectedAccount) return;
+    setLoading(true);
+    try {
+      const account = { ...selectedAccount, password: makePassword() };
+      await saveStudentAccount(account);
+      await refreshStudents(account.studentId);
+      notify("New student password saved to Supabase.");
+    } catch (error) {
+      console.error("Password update failed:", error);
+      notify(error instanceof Error ? error.message : "Could not update password.");
+    } finally {
+      setLoading(false);
+    }
+  }
   async function copyCredentials() { if (!selectedAccount) return; await navigator.clipboard?.writeText(`Student ID: ${selectedAccount.studentId}\nPassword: ${selectedAccount.password}`); notify("Credentials copied."); }
 
   async function deleteEnrollment(application: AdmissionsApplication) {
