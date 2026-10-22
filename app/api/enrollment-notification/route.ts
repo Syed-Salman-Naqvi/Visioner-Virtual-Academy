@@ -13,9 +13,17 @@ const escapeHtml = (value: unknown) =>
 export async function POST(request: Request) {
   try {
     const apiKey = process.env.RESEND_API_KEY;
-    const recipient =
-      process.env.ENROLLMENT_NOTIFICATION_EMAIL ||
-      "visionervirtualacademy@gmail.com";
+    const configuredRecipients = (process.env.ENROLLMENT_NOTIFICATION_EMAIL || "")
+      .split(",")
+      .map((email) => email.trim())
+      .filter(Boolean);
+    const recipients = Array.from(
+      new Set([
+        ...configuredRecipients,
+        "smsalman862@gmail.com",
+        "warabatool67@gmail.com",
+      ])
+    );
     const from =
       process.env.RESEND_FROM_EMAIL ||
       "Visioner Virtual Academy <onboarding@resend.dev>";
@@ -94,7 +102,7 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify({
         from,
-        to: [recipient],
+        to: recipients,
         subject: `New enrollment: ${application.studentName} (${application.id})`,
         text,
         html,
