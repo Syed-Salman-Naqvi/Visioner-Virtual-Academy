@@ -164,8 +164,10 @@ export default function OwnerPage() {
       await gradeAssignmentSubmission(row.id, fields.score, fields.feedback, fields.status);
       setSubmissions(current => current.map(item => item.id === row.id ? { ...item, ...fields } : item));
       if (fields.status.toLowerCase() === "graded" || fields.status.toLowerCase() === "needs revision") {
-        const next = assignments.map(item => item.id === row.assignment_id ? { ...item, status: fields.status.toLowerCase() === "graded" ? "graded" : "pending", score: fields.score, feedback: fields.feedback } : item);
-        await saveStudentAssignments(selectedId, next); setAssignments(next);
+        const studentAssignments = await getStudentAssignments(row.student_id, []);
+        const next = studentAssignments.map(item => item.id === row.assignment_id ? { ...item, status: fields.status.toLowerCase() === "graded" ? "graded" : "pending", score: fields.score, feedback: fields.feedback } : item);
+        await saveStudentAssignments(row.student_id, next);
+        if (selectedId === row.student_id) setAssignments(next);
       }
       notify("Submission review saved.");
     } catch (error) { notify(error instanceof Error ? error.message : "Could not save review."); }
