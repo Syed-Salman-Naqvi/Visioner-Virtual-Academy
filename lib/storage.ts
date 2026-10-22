@@ -66,7 +66,7 @@ export async function getStudentAccounts(): Promise<StudentAccount[]> {
 
 export async function saveStudentAccount(account: StudentAccount): Promise<void> {
   if (typeof window !== "undefined") try { const raw = localStorage.getItem("vva_student_accounts"); const list: StudentAccount[] = raw ? JSON.parse(raw) : []; localStorage.setItem("vva_student_accounts", JSON.stringify([account, ...list.filter((x) => x.studentId?.toUpperCase() !== account.studentId?.toUpperCase())])); } catch {}
-  const { error } = await supabase.from("student_accounts").upsert({ application_id: account.applicationId, student_id: account.studentId, password: account.password, student_name: account.studentName, student_email: account.studentEmail, created_at: account.createdAt }, { onConflict: "student_id" });
+  const { error } = await supabase.from("student_accounts").upsert({ id: account.studentId || account.applicationId, application_id: account.applicationId, student_id: account.studentId, password: account.password, student_name: account.studentName, student_email: account.studentEmail, created_at: account.createdAt }, { onConflict: "student_id" });
   if (error) { console.error("Supabase account save error:", error); throw new Error(`Could not save student credentials to Supabase: ${error.message}`); }
 }
 
