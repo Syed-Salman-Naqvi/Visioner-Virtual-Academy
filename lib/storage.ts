@@ -66,8 +66,12 @@ export async function getStudentAccounts(): Promise<StudentAccount[]> {
 
 export async function saveStudentAccount(account: StudentAccount): Promise<void> {
   if (typeof window !== "undefined") try { const raw = localStorage.getItem("vva_student_accounts"); const list: StudentAccount[] = raw ? JSON.parse(raw) : []; localStorage.setItem("vva_student_accounts", JSON.stringify([account, ...list.filter((x) => x.studentId?.toUpperCase() !== account.studentId?.toUpperCase())])); } catch {}
-  const { error } = await supabase.from("student_accounts").upsert({ id: account.studentId || account.applicationId, application_id: account.applicationId, student_id: account.studentId, password: account.password, student_name: account.studentName, student_email: account.studentEmail, created_at: account.createdAt }, { onConflict: "student_id" });
+  const studentId = account.studentId?.trim() || account.applicationId?.trim();
+  if (!studentId) throw new Error("Student ID is missing; credentials were not saved.");
+  const payload = { id: studentId, application_id: account.applicationId || studentId, student_id: studentId, password: account.password, student_name: account.studentName, email: account.studentEmail || "", student_email: account.studentEmail || "", created_at: account.createdAt || new Date().toISOString() };
+  const { data, error } = await supabase.from("student_accounts").upsert(payload, { onConflict: "id" }).select("id, student_id").single();
   if (error) { console.error("Supabase account save error:", error); throw new Error(`Could not save student credentials to Supabase: ${error.message}`); }
+  if (!data?.student_id) throw new Error("Supabase did not confirm the student account was saved.");
 }
 
 export async function deleteStudentAccount(studentId: string): Promise<void> {
