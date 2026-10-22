@@ -67,7 +67,7 @@ export async function getStudentAccounts(): Promise<StudentAccount[]> {
 export async function saveStudentAccount(account: StudentAccount): Promise<void> {
   if (typeof window !== "undefined") try { const raw = localStorage.getItem("vva_student_accounts"); const list: StudentAccount[] = raw ? JSON.parse(raw) : []; localStorage.setItem("vva_student_accounts", JSON.stringify([account, ...list.filter((x) => x.studentId?.toUpperCase() !== account.studentId?.toUpperCase())])); } catch {}
   const { error } = await supabase.from("student_accounts").upsert({ application_id: account.applicationId, student_id: account.studentId, password: account.password, student_name: account.studentName, student_email: account.studentEmail, created_at: account.createdAt }, { onConflict: "student_id" });
-  if (error) console.error("Supabase account save error:", error);
+  if (error) { console.error("Supabase account save error:", error); throw new Error(`Could not save student credentials to Supabase: ${error.message}`); }
 }
 
 export async function deleteStudentAccount(studentId: string): Promise<void> {
@@ -116,14 +116,14 @@ export async function saveStudentAssignments(studentId: string, assignments: Ass
   if (typeof window !== "undefined") try { localStorage.setItem(`vva_assignments_${id}`, JSON.stringify(assignments)); } catch {}
   try {
     const { error: deleteError } = await supabase.from("assignments").delete().eq("student_id", id);
-    if (deleteError) { console.error("Cloud assignments delete/sync error:", deleteError); return; }
+    if (deleteError) { console.error("Cloud assignments delete/sync error:", deleteError); throw new Error(`Could not sync assignments to Supabase: ${deleteError.message}`); }
     if (assignments.length) {
       const rows = assignments.map((assignment) => ({ id: assignment.id, student_id: id, title: assignment.title, subject: assignment.course, course: assignment.course,
         subject_code: assignment.courseCode || null, course_code: assignment.courseCode || null, due_date: assignment.dueDate || null, status: assignment.status || "pending",
         instructions: assignment.instructions || null, score: assignment.score || null, feedback: assignment.feedback || null, urgency: assignment.urgency || "normal",
         submitted_at: assignment.submittedAt || null, submission_notes: assignment.submissionNotes || null, assignment, updated_at: new Date().toISOString() }));
       const { error: insertError } = await supabase.from("assignments").insert(rows);
-      if (insertError) console.error("Cloud assignments insert/sync error:", insertError);
+      if (insertError) { console.error("Cloud assignments insert/sync error:", insertError); throw new Error(`Could not publish assignments to Supabase: ${insertError.message}`); }
     }
-  } catch (error) { console.error("Cloud assignments sync exception:", error); }
+  } catch (error) { console.error("Cloud assignments sync exception:", error); throw error; }
 }
