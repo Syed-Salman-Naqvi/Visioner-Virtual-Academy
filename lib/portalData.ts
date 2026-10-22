@@ -115,3 +115,37 @@ export async function getStudentPortalData(studentId: string, sessionUser?: any)
   } catch (error) { console.warn('Application lookup skipped:', error); }
   return cloud;
 }
+
+export interface AssignmentSubmission {
+  id: string; assignment_id: string; student_id: string; student_name?: string | null;
+  submission_notes?: string | null; file_url?: string | null; file_name?: string | null;
+  storage_path?: string | null; submitted_at: string; status: string; score?: string | null; feedback?: string | null;
+}
+
+export async function getAssignmentSubmissions(assignmentId: string): Promise<AssignmentSubmission[]> {
+  const { data, error } = await supabase.from('assignment_submissions').select('*').eq('assignment_id', assignmentId).order('submitted_at', { ascending: false });
+  if (error) throw new Error(`Could not load assignment submissions: ${error.message}`);
+  return (data || []) as AssignmentSubmission[];
+}
+
+export async function saveAssignmentSubmission(input: {
+  assignment_id: string; student_id: string; student_name: string; submission_notes: string;
+  file_url?: string | null; file_name?: string | null; storage_path?: string | null;
+}): Promise<AssignmentSubmission> {
+  const { data, error } = await supabase.from('assignment_submissions').upsert({
+    ...input, status: 'Submitted', submitted_at: new Date().toISOString(), updated_at: new Date().toISOString()
+  }, { onConflict: 'assignment_id,student_id' }).select('*').single();
+  if (error) throw new Error(`Could not save assignment submission: ${error.message}`);
+  return data as AssignmentSubmission;
+}
+
+export async function gradeAssignmentSubmission(id: string, score: string, feedback: string, status: string): Promise<void> {
+  const { error } = await supabase.from('assignment_submissions').update({ score, feedback, status, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) throw new Error(`Could not update submission review: ${error.message}`);
+}
+
+export async function createSubmissionDownloadUrl(storagePath: string): Promise<string> {
+  const { data, error } = await supabase.storage.from('assignment-submissions').createSignedUrl(storagePath, 60 * 10);
+  if (error || !data?.signedUrl) throw new Error(`Could not create download link: ${error?.message || 'No signed URL returned'}`);
+  return data.signedUrl;
+}
