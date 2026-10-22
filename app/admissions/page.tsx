@@ -1307,6 +1307,31 @@ export default function AdmissionsPage() {
     };
 
     await saveApplication(newApp);
+
+    // Send an email notification in the background without changing the enrollment UI.
+    // The application is still saved and the student sees the existing confirmation
+    // even if the email provider is temporarily unavailable.
+    try {
+      const notificationResponse = await fetch("/api/enrollment-notification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          application: newApp,
+          details: {
+            previousSchool: formData.previousSchool,
+            previousSchoolCountry: formData.previousSchoolCountry,
+            subjectsOfInterest: formData.subjectsOfInterest,
+            preferredContact: formData.preferredContact,
+          },
+        }),
+      });
+      if (!notificationResponse.ok) {
+        console.error("Enrollment was saved, but the email notification could not be sent.");
+      }
+    } catch (notificationError) {
+      console.error("Enrollment was saved, but the email notification request failed.", notificationError);
+    }
+
     setSubmittedApp(newApp);
     window.setTimeout(() => {
       setIsSubmitted(true);
