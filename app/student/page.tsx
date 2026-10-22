@@ -48,7 +48,7 @@ export default function StudentPortalPage() {
         storagePath = `${student.studentId}/${selected.id}/${Date.now()}-${safeName}`;
         const { error: uploadError } = await supabase.storage.from("assignment-submissions").upload(storagePath, selectedFile, { upsert: false, contentType: selectedFile.type || "application/octet-stream" });
         if (uploadError) throw new Error(`File upload failed: ${uploadError.message}`);
-        fileUrl = storagePath;
+        fileUrl = supabase.storage.from("assignment-submissions").getPublicUrl(storagePath).data.publicUrl;
       }
       await saveAssignmentSubmission({
         assignment_id: selected.id, student_id: student.studentId, student_name: student.name || "Student",
