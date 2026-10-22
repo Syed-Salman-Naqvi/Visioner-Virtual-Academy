@@ -94,32 +94,55 @@ export async function POST(request: Request) {
       </table>
     `;
 
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from,
-        to: recipients,
-        subject: `New enrollment: ${application.studentName} (${application.id})`,
-        text,
-        html,
-      }),
-      cache: "no-store",
-    });
+    // Send separately to prevent one rejected recipient from blocking all other recipients.
+    const results = await Promise.all(
+      recipients.map(async (to) => {
+        try {
+          const response = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              from,
+              to: [to],
+              subject: `New enrollment: ${application.studentName} (${application.id})`,
+              text,
+              html,
+            }),
+            cache: "no-store",
+          });
 
-    if (!response.ok) {
-      const errorBody = await response.text();
-      console.error("Resend enrollment notification failed:", response.status, errorBody);
+          if (!response.ok) {
+            const errorBody = await response.text();
+            console.error(`Resend enrollment notification failed for ${to}:`, response.status, errorBody);
+            return { recipient: to, ok: false };
+          }
+
+          return { recipient: to, ok: true };
+        } catch (error) {
+          console.error(`Resend enrollment notification request failed for ${to}:`, error);
+          return { recipient: to, ok: false };
+        }
+      })
+    );
+
+    const sent = results.filter((result) => result.ok);
+    const failed = results.filter((result) => !result.ok);
+
+    if (sent.length === 0) {
       return NextResponse.json(
-        { ok: false, error: "Email provider could not send the notification." },
+        { ok: false, error: "Email provider could not send any enrollment notifications." },
         { status: 502 }
       );
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({
+      ok: true,
+      sentTo: sent.map((result) => result.recipient),
+      failedRecipients: failed.map((result) => result.recipient),
+    });
   } catch (error) {
     console.error("Enrollment notification error:", error);
     return NextResponse.json(
