@@ -111,7 +111,7 @@ export default function OwnerPage() {
     if (selectedId === studentId || selectedId === application.id) { setSelectedId(""); setRecords(null); setAssignments([]); }
     try {
       await deleteApplication(application.id);
-      await Promise.all([deleteStudentAccount(studentId), deleteStudentAssignments(studentId), deleteStudentPortalRecords(studentId)]);
+      await Promise.all([deleteStudentAccount(studentId), deleteStudentAssignments(studentId), deleteStudentPortalRecords(studentId), ...(studentId !== application.id ? [deleteStudentAssignments(application.id), deleteStudentPortalRecords(application.id)] : [])]);
       await refreshStudents(""); setTab("enrollments"); notify("Enrollment and linked student data deleted.");
     } catch (error) {
       notify(error instanceof Error ? error.message : "Deletion failed. Refresh and try again.");
