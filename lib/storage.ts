@@ -4,7 +4,7 @@ import { AdmissionsApplication, StudentAccount, Assignment } from "./types";
 export async function getSavedApplications(): Promise<AdmissionsApplication[]> {
   let localApps: AdmissionsApplication[] = [];
   if (typeof window !== "undefined") {
-    try { const raw = localStorage.getItem("vva_admissions_apps"); if (raw) localApps = JSON.parse(raw); } catch {}
+    try { const raw = localStorage.getItem("vva_admissions_apps"); if (raw) localApps = JSON.parse(raw).filter((app: any) => app?.id !== "VVA-2026-8842" && String(app?.studentName || "").toLowerCase() !== "aiden vance" && String(app?.studentEmail || "").toLowerCase() !== "aiden.vance@example.com"); } catch {}
   }
   let dbApps: AdmissionsApplication[] = [];
   try {
