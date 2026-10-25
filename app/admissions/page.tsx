@@ -29,6 +29,7 @@
 //   File,
 // } from "lucide-react";
 // import { saveApplication, findApplicationById } from "@/lib/storage";
+import { supabase } from "@/lib/supabase";
 // import { AdmissionsApplication } from "@/lib/types";
 
 // export default function AdmissionsPage() {
@@ -80,7 +81,7 @@
 
 //   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 //   const [isDragging, setIsDragging] = useState(false);
-//   const [attachedFiles, setAttachedFiles] = useState<Array<{ name: string; size: string }>>([]);
+//   const [attachedFiles, setAttachedFiles] = useState<Array<{ name: string; size: string; storagePath?: string }>>([]);
 
 //   const subjectOptions = [
 //     "Mathematics (Pure & Mechanics)",
@@ -191,7 +192,7 @@
 //       timeZone: formData.timeZone,
 //       preferredCohortSlot: formData.preferredCohortSlot,
 //       assignedAdvisor: "Ms. Rebecca Vance (Dean of Admissions)",
-//       documentsAttached: attachedFiles.map((f) => `${f.name} (${f.size})`),
+//       documentsAttached: attachedFiles.map((f) => ({ name: f.name, size: f.size, storagePath: f.storagePath })),
 //       statementOfPurpose: formData.statementOfPurpose,
 //     };
 
@@ -1225,22 +1226,26 @@ export default function AdmissionsPage() {
     }
   };
 
-  const processUploadedFiles = (files: FileList | null) => {
+  const processUploadedFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    const newItems = Array.from(files).map((f) => {
-      const sizeMb = (f.size / (1024 * 1024)).toFixed(2);
-      const sizeFormatted = f.size > 1024 * 1024 ? `${sizeMb} MB` : `${Math.round(f.size / 1024)} KB`;
-      return {
-        name: f.name,
-        size: sizeFormatted,
-      };
-    });
-
-    setAttachedFiles((prev) => {
-      const existingNames = new Set(prev.map((item) => item.name));
-      const uniqueNew = newItems.filter((item) => !existingNames.has(item.name));
-      return [...prev, ...uniqueNew];
-    });
+    for (const file of Array.from(files)) {
+      if (file.size > 10 * 1024 * 1024) {
+        window.alert(`"${file.name}" exceeds the 10 MB limit.`);
+        continue;
+      }
+      try {
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const storagePath = `enrollments/${Date.now()}-${crypto.randomUUID()}-${safeName}`;
+        const { error } = await supabase.storage.from("enrollment-documents").upload(storagePath, file, { upsert: false, contentType: file.type || "application/octet-stream" });
+        if (error) throw error;
+        const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+        const sizeFormatted = file.size > 1024 * 1024 ? `${sizeMb} MB` : `${Math.max(1, Math.round(file.size / 1024))} KB`;
+        setAttachedFiles((prev) => prev.some((item) => item.name === file.name) ? prev : [...prev, { name: file.name, size: sizeFormatted, storagePath }]);
+      } catch (error) {
+        console.error("Enrollment document upload failed:", error);
+        window.alert(`Could not upload ${file.name}. Please try again or contact the academy.`);
+      }
+    }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
