@@ -1,10 +1,14 @@
 import { supabase } from "./supabase";
 import { AdmissionsApplication, StudentAccount, Assignment } from "./types";
 
+const DEMO_STUDENT_NAMES = new Set(["salufa shah sham", "test student", "aiden vance"]);
+const isDemoStudent = (value: any) => DEMO_STUDENT_NAMES.has(String(value?.studentName || value?.student_name || "").trim().toLowerCase())
+  || /^(?:VVA-INTL-380440|VVA-INTL-159994|VVA-INTL-443603|VVA-2026-8842)$/i.test(String(value?.studentId || value?.student_id || value?.applicationId || value?.application_id || value?.id || "").trim());
+
 export async function getSavedApplications(): Promise<AdmissionsApplication[]> {
   let localApps: AdmissionsApplication[] = [];
   if (typeof window !== "undefined") {
-    try { const raw = localStorage.getItem("vva_admissions_apps"); if (raw) localApps = JSON.parse(raw).filter((app: any) => app?.id !== "VVA-2026-8842" && String(app?.studentName || "").toLowerCase() !== "aiden vance" && String(app?.studentEmail || "").toLowerCase() !== "aiden.vance@example.com"); } catch {}
+    try { const raw = localStorage.getItem("vva_admissions_apps"); if (raw) localApps = JSON.parse(raw).filter((app: any) => !isDemoStudent(app) && String(app?.studentEmail || "").toLowerCase() !== "aiden.vance@example.com"); } catch {}
   }
   let dbApps: AdmissionsApplication[] = [];
   try {
@@ -20,7 +24,7 @@ export async function getSavedApplications(): Promise<AdmissionsApplication[]> {
     }));
   } catch (error) { console.error("Cloud applications read error:", error); }
   const map = new Map<string, AdmissionsApplication>();
-  [...localApps, ...dbApps].forEach((app) => app?.id && map.set(app.id.trim().toUpperCase(), app));
+  [...localApps, ...dbApps].filter((app) => !isDemoStudent(app)).forEach((app) => app?.id && map.set(app.id.trim().toUpperCase(), app));
   return [...map.values()];
 }
 
@@ -59,7 +63,7 @@ export async function getStudentAccounts(): Promise<StudentAccount[]> {
     cloud = (data || []).map((x: any) => ({ applicationId: x.application_id || x.applicationId, studentId: x.student_id || x.studentId || x.application_id, password: x.password || "", studentName: x.student_name || x.studentName || "Student", studentEmail: x.student_email || x.studentEmail || "", createdAt: x.created_at || x.createdAt || "" }));
   } catch (error) { console.error("Cloud student accounts read error:", error); }
   const map = new Map<string, StudentAccount>();
-  [...local, ...cloud].forEach((x) => { if (x?.studentId) map.set(x.studentId.toUpperCase(), x); });
+  [...local, ...cloud].filter((x) => !isDemoStudent(x)).forEach((x) => { if (x?.studentId) map.set(x.studentId.toUpperCase(), x); });
   return [...map.values()];
 }
 
