@@ -124,7 +124,7 @@ export interface AdmissionsApplication {
   timeZone?: string;
   assignedAdvisor?: string;
   statementOfPurpose?: string;
-  documentsAttached?: string[];
+  documentsAttached?: Array<string | { name: string; size?: string; storagePath?: string }>;
   status: "Under Review" | "Verified" | "Interview Scheduled" | "Accepted" | string;
   createdAt: string;
   [key: string]: any;
