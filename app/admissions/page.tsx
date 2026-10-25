@@ -173,16 +173,16 @@ import { supabase } from "@/lib/supabase";
 //   const handleSubmit = (e: React.FormEvent) => {
 //     e.preventDefault();
 //     let generatedId = "";
-    // Check Supabase and local saved applications before using a reference ID.
-    // This prevents a new submission from colliding with an older enrollment.
-    for (let attempt = 0; attempt < 20; attempt++) {
-      const candidate = `VVA-INTL-${Math.floor(100000 + Math.random() * 900000)}`;
-      if (!(await findApplicationById(candidate))) { generatedId = candidate; break; }
-    }
-    if (!generatedId) {
-      window.alert("Could not generate a unique application reference. Please submit again.");
-      return;
-    }
+//     // Check Supabase and local saved applications before using a reference ID.
+//     // This prevents a new submission from colliding with an older enrollment.
+//     for (let attempt = 0; attempt < 20; attempt++) {
+//       const candidate = `VVA-INTL-${Math.floor(100000 + Math.random() * 900000)}`;
+//       if (!(await findApplicationById(candidate))) { generatedId = candidate; break; }
+//     }
+//     if (!generatedId) {
+//       window.alert("Could not generate a unique application reference. Please submit again.");
+//       return;
+//     }
 
 //     const newApp: AdmissionsApplication = {
 //       id: generatedId,
@@ -1306,26 +1306,35 @@ export default function AdmissionsPage() {
     e.preventDefault();
     if (attachedFiles.length === 0) { setCurrentStep(5); window.alert("Please upload at least one academic document before submitting your enrollment."); return; }
     if (isUploadingFiles) { window.alert("Please wait until document uploads finish before submitting."); return; }
-    const generatedId = `VVA-INTL-${Math.floor(100000 + Math.random() * 900000)}`;
+    let generatedId = "";
+    // Check existing cloud and local records to avoid reusing an application reference.
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const candidate = `VVA-INTL-${Math.floor(100000 + Math.random() * 900000)}`;
+      if (!(await findApplicationById(candidate))) { generatedId = candidate; break; }
+    }
+    if (!generatedId) {
+      window.alert("Could not generate a unique application reference. Please submit again.");
+      return;
+    }
 
     const newApp: AdmissionsApplication = {
       id: generatedId,
-      createdAt: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      createdAt: new Date().toISOString(),
       status: "Under Review",
-      studentName: `${formData.firstName} ${formData.lastName}`.trim() || "Aiden Vance",
-      studentEmail: formData.parentEmail || "student@domain.com",
-      dateOfBirth: formData.dateOfBirth || "2009-04-12",
-      nationality: formData.nationality || "British",
+      studentName: `${formData.firstName} ${formData.lastName}`.trim(),
+      studentEmail: formData.parentEmail.trim(),
+      dateOfBirth: formData.dateOfBirth,
+      nationality: formData.nationality,
       countryOfResidence: formData.countryOfResidence,
-      city: formData.city || "Dubai",
-      parentName: formData.parentName || "Dr. Robert Vance",
-      parentEmail: formData.parentEmail || "parent@domain.com",
+      city: formData.city,
+      parentName: formData.parentName,
+      parentEmail: formData.parentEmail,
       parentPhone: `${formData.parentPhoneCountryCode} ${formData.parentPhone}`,
       targetTrack: formData.targetTrack,
       gradeLevel: formData.gradeLevel,
       timeZone: formData.timeZone,
       preferredCohortSlot: formData.preferredCohortSlot,
-      assignedAdvisor: "Ms. Rebecca Vance (Dean of Admissions)",
+      assignedAdvisor: "Admissions Office",
       documentsAttached: attachedFiles.map((f) => ({ name: f.name, size: f.size, storagePath: f.storagePath })),
       statementOfPurpose: formData.statementOfPurpose,
     };
