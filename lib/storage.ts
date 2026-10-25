@@ -134,3 +134,10 @@ export async function saveStudentAssignments(studentId: string, assignments: Ass
     }
   } catch (error) { console.error("Cloud assignments sync exception:", error); throw error; }
 }
+
+
+export async function createEnrollmentDocumentDownloadUrl(storagePath: string): Promise<string> {
+  const { data, error } = await supabase.storage.from("enrollment-documents").createSignedUrl(storagePath, 60 * 10, { download: true });
+  if (error || !data?.signedUrl) throw new Error(`Could not create document download link: ${error?.message || "No signed URL returned"}`);
+  return data.signedUrl;
+}
