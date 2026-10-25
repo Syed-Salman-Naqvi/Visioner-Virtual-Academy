@@ -812,7 +812,6 @@ import { supabase } from "@/lib/supabase";
 //                             }`}
 //                           >
 //                             <UploadCloud className="w-8 h-8 text-indigo-400 mx-auto mb-2" />
-                            {isUploadingFiles && <p className="mb-2 text-xs font-semibold text-amber-300">Uploading documents… please wait</p>}
 //                             {isUploadingFiles && <p className="mb-2 text-xs font-semibold text-amber-300">Uploading documents… please wait</p>}
 //                             <p className="text-xs text-slate-200 font-medium">
 //                               <span className="text-indigo-400 underline font-semibold">Click to browse your computer</span> or drag & drop files here
