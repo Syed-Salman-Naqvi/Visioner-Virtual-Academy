@@ -785,7 +785,7 @@ import { supabase } from "@/lib/supabase";
 //                             ref={fileInputRef}
 //                             onChange={handleFileSelect}
 //                             multiple
-//                             accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+//                             accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.webp,.heic,.heif"
 //                             className="hidden"
 //                           />
 
@@ -802,11 +802,12 @@ import { supabase } from "@/lib/supabase";
 //                             }`}
 //                           >
 //                             <UploadCloud className="w-8 h-8 text-indigo-400 mx-auto mb-2" />
+                            {isUploadingFiles && <p className="mb-2 text-xs font-semibold text-amber-300">Uploading documents… please wait</p>}
 //                             <p className="text-xs text-slate-200 font-medium">
 //                               <span className="text-indigo-400 underline font-semibold">Click to browse your computer</span> or drag & drop files here
 //                             </p>
 //                             <span className="text-[10px] text-slate-400 block mt-1">
-//                               Supports PDF, PNG, JPG, DOC, DOCX up to 25MB
+//                               Required: at least one PDF, DOC, DOCX, JPG, PNG, or WEBP document (max 10MB each).
 //                             </span>
 //                           </div>
 
@@ -1185,7 +1186,8 @@ export default function AdmissionsPage() {
 
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [attachedFiles, setAttachedFiles] = useState<Array<{ name: string; size: string }>>([]);
+  const [attachedFiles, setAttachedFiles] = useState<Array<{ name: string; size: string; storagePath: string }>>([]);
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
 
   const subjectOptions = [
     "Mathematics (Pure & Mechanics)",
@@ -1227,6 +1229,8 @@ export default function AdmissionsPage() {
 
   const processUploadedFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
+    setIsUploadingFiles(true);
+    try {
     for (const file of Array.from(files)) {
       if (file.size > 10 * 1024 * 1024) {
         window.alert(`"${file.name}" exceeds the 10 MB limit.`);
@@ -1240,10 +1244,13 @@ export default function AdmissionsPage() {
         const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
         const sizeFormatted = file.size > 1024 * 1024 ? `${sizeMb} MB` : `${Math.max(1, Math.round(file.size / 1024))} KB`;
         setAttachedFiles((prev) => prev.some((item) => item.name === file.name) ? prev : [...prev, { name: file.name, size: sizeFormatted, storagePath }]);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Enrollment document upload failed:", error);
-        window.alert(`Could not upload ${file.name}. Please try again or contact the academy.`);
+        window.alert("Could not upload " + file.name + ": " + (error?.message || error?.error_description || "Unknown storage error"));
       }
+    }
+    } finally {
+      setIsUploadingFiles(false);
     }
   };
 
@@ -1286,6 +1293,8 @@ export default function AdmissionsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (attachedFiles.length === 0) { setCurrentStep(5); window.alert("Please upload at least one academic document before submitting your enrollment."); return; }
+    if (isUploadingFiles) { window.alert("Please wait until document uploads finish before submitting."); return; }
     const generatedId = `VVA-INTL-${Math.floor(100000 + Math.random() * 900000)}`;
 
     const newApp: AdmissionsApplication = {
@@ -1306,7 +1315,7 @@ export default function AdmissionsPage() {
       timeZone: formData.timeZone,
       preferredCohortSlot: formData.preferredCohortSlot,
       assignedAdvisor: "Ms. Rebecca Vance (Dean of Admissions)",
-      documentsAttached: attachedFiles.map((f) => `${f.name} (${f.size})`),
+      documentsAttached: attachedFiles.map((f) => ({ name: f.name, size: f.size, storagePath: f.storagePath })),
       statementOfPurpose: formData.statementOfPurpose,
     };
 
